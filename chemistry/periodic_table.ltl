@@ -1,0 +1,43 @@
+// ────────────────────────────────────────────────────────────
+// Periodic Table Lookup
+// ────────────────────────────────────────────────────────────
+
+pub fn build_elements() -> map {
+    let mut elements = {}
+    let data = [
+        ["H", "Hydrogen", 1, 1.008],
+        ["He", "Helium", 2, 4.003],
+        ["Li", "Lithium", 3, 6.941],
+        ["Be", "Beryllium", 4, 9.012],
+        ["B", "Boron", 5, 10.81],
+        ["C", "Carbon", 6, 12.01],
+        ["N", "Nitrogen", 7, 14.01],
+        ["O", "Oxygen", 8, 16.00],
+        ["F", "Fluorine", 9, 19.00],
+        ["Ne", "Neon", 10, 20.18]
+    ]
+    for el in data {
+        elements[el[0]] = {"name": el[1], "number": el[2], "weight": el[3]}
+    }
+    return elements
+}
+
+pub fn molecular_weight(formula: list, elements: map) -> float {
+    let mut weight = 0.0
+    for part in formula {
+        let symbol = part[0]
+        let count = part[1] as float
+        if has_key(elements, symbol) {
+            weight += elements[symbol]["weight"] as float * count
+        }
+    }
+    return weight
+}
+
+fn main() {
+    let elements = build_elements()
+    let water = [["H", 2], ["O", 1]]
+    println("H2O weight: " + round(molecular_weight(water, elements), 3) as str)
+    let co2 = [["C", 1], ["O", 2]]
+    println("CO2 weight: " + round(molecular_weight(co2, elements), 3) as str)
+}

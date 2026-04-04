@@ -1,0 +1,34 @@
+// ────────────────────────────────────────────────────────────
+// Numerical Integration
+// ────────────────────────────────────────────────────────────
+
+pub fn trapezoid(f: fn(float) -> float, a: float, b: float, n: int) -> float {
+    let h = (b - a) / n as float
+    let mut sum = (f(a) + f(b)) / 2.0
+    let mut i = 1
+    while i < n {
+        sum += f(a + i as float * h)
+        i += 1
+    }
+    return sum * h
+}
+
+pub fn simpson(f: fn(float) -> float, a: float, b: float, n: int) -> float {
+    let h = (b - a) / n as float
+    let mut sum = f(a) + f(b)
+    let mut i = 1
+    while i < n {
+        let x = a + i as float * h
+        if i % 2 == 0 { sum += 2.0 * f(x) }
+        else { sum += 4.0 * f(x) }
+        i += 1
+    }
+    return sum * h / 3.0
+}
+
+fn main() {
+    let f = fn(x: float) -> float { return x * x }
+    println("∫x² from 0 to 1 (trap): " + round(trapezoid(f, 0.0, 1.0, 1000), 6) as str)
+    println("∫x² from 0 to 1 (simp): " + round(simpson(f, 0.0, 1.0, 1000), 6) as str)
+    println("Exact: 0.333333")
+}

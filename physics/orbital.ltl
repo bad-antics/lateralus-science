@@ -1,0 +1,47 @@
+// ────────────────────────────────────────────────────────────
+// Orbital Mechanics
+// ────────────────────────────────────────────────────────────
+
+pub struct Body {
+    x: float; y: float
+    vx: float; vy: float
+    mass: float
+}
+
+pub fn gravity_step(bodies: list, dt: float, G: float) {
+    let n = len(bodies)
+    let mut i = 0
+    while i < n {
+        let mut j = 0
+        while j < n {
+            if i != j {
+                let dx = bodies[j].x - bodies[i].x
+                let dy = bodies[j].y - bodies[i].y
+                let r2 = dx * dx + dy * dy + 0.001
+                let r = sqrt(r2)
+                let f = G * bodies[j].mass / r2
+                bodies[i].vx += f * dx / r * dt
+                bodies[i].vy += f * dy / r * dt
+            }
+            j += 1
+        }
+        i += 1
+    }
+    for body in bodies {
+        body.x += body.vx * dt
+        body.y += body.vy * dt
+    }
+}
+
+fn main() {
+    let mut bodies = [
+        Body { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, mass: 1000.0 },
+        Body { x: 10.0, y: 0.0, vx: 0.0, vy: 3.0, mass: 1.0 }
+    ]
+    let mut step = 0
+    while step < 100 {
+        gravity_step(bodies, 0.1, 1.0)
+        step += 1
+    }
+    println("Planet pos: (" + round(bodies[1].x, 2) as str + ", " + round(bodies[1].y, 2) as str + ")")
+}

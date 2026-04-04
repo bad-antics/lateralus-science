@@ -1,0 +1,38 @@
+// ────────────────────────────────────────────────────────────
+// Fast Fourier Transform
+// ────────────────────────────────────────────────────────────
+
+pub fn dft(signal: list) -> list {
+    let n = len(signal)
+    let mut result = []
+    let mut k = 0
+    while k < n {
+        let mut re = 0.0; let mut im = 0.0
+        let mut t = 0
+        while t < n {
+            let angle = -2.0 * 3.14159 * k as float * t as float / n as float
+            re += signal[t] as float * cos(angle)
+            im += signal[t] as float * sin(angle)
+            t += 1
+        }
+        result = push(result, {"re": round(re, 4), "im": round(im, 4)})
+        k += 1
+    }
+    return result
+}
+
+pub fn magnitude_spectrum(freq: list) -> list {
+    let mut mags = []
+    for f in freq {
+        let mag = sqrt(f["re"] * f["re"] + f["im"] * f["im"])
+        mags = push(mags, round(mag, 4))
+    }
+    return mags
+}
+
+fn main() {
+    let signal = [1.0, 0.0, -1.0, 0.0, 1.0, 0.0, -1.0, 0.0]
+    let spectrum = dft(signal)
+    let mags = magnitude_spectrum(spectrum)
+    println("Magnitudes: " + mags as str)
+}

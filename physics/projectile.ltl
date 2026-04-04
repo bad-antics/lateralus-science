@@ -1,0 +1,26 @@
+// ────────────────────────────────────────────────────────────
+// Projectile Motion
+// ────────────────────────────────────────────────────────────
+
+pub fn projectile(v0: float, angle_deg: float, dt: float) -> list {
+    let angle = angle_deg * 3.14159 / 180.0
+    let vx = v0 * cos(angle)
+    let vy = v0 * sin(angle)
+    let g = 9.81
+    let mut x = 0.0; let mut y = 0.0
+    let mut t = 0.0; let mut path = []
+    while y >= 0.0 || t == 0.0 {
+        path = push(path, {"t": round(t, 2), "x": round(x, 2), "y": round(y, 2)})
+        x += vx * dt
+        y += vy * dt - 0.5 * g * dt * dt
+        vy -= g * dt
+        t += dt
+    }
+    return path
+}
+
+fn main() {
+    let path = projectile(50.0, 45.0, 0.1)
+    println("Points: " + len(path) as str)
+    println("Max range: " + path[len(path) - 1]["x"] as str + " m")
+}

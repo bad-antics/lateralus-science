@@ -1,0 +1,48 @@
+// ────────────────────────────────────────────────────────────
+// Linear Regression
+// ────────────────────────────────────────────────────────────
+
+pub fn linear_regression(x: list, y: list) -> list {
+    let n = len(x) as float
+    let mut sum_x = 0.0; let mut sum_y = 0.0
+    let mut sum_xy = 0.0; let mut sum_x2 = 0.0
+    let mut i = 0
+    while i < len(x) {
+        sum_x += x[i] as float
+        sum_y += y[i] as float
+        sum_xy += (x[i] as float) * (y[i] as float)
+        sum_x2 += (x[i] as float) * (x[i] as float)
+        i += 1
+    }
+    let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x)
+    let intercept = (sum_y - slope * sum_x) / n
+    return [slope, intercept]
+}
+
+pub fn predict(model: list, x: float) -> float {
+    return model[0] * x + model[1]
+}
+
+pub fn r_squared(x: list, y: list, model: list) -> float {
+    let mut ss_res = 0.0; let mut ss_tot = 0.0
+    let mean_y = 0.0
+    for yi in y { mean_y += yi as float }
+    let avg = mean_y / len(y) as float
+    let mut i = 0
+    while i < len(x) {
+        let pred = predict(model, x[i] as float)
+        ss_res += (y[i] as float - pred) * (y[i] as float - pred)
+        ss_tot += (y[i] as float - avg) * (y[i] as float - avg)
+        i += 1
+    }
+    return 1.0 - ss_res / ss_tot
+}
+
+fn main() {
+    let x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    let y = [2.1, 3.9, 6.2, 7.8, 10.1, 12.0, 14.1, 15.9, 18.2, 19.8]
+    let model = linear_regression(x, y)
+    println("y = " + round(model[0], 3) as str + "x + " + round(model[1], 3) as str)
+    println("R² = " + round(r_squared(x, y, model), 4) as str)
+    println("Predict x=15: " + round(predict(model, 15.0), 2) as str)
+}
