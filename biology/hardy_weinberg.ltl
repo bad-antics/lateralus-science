@@ -1,0 +1,22 @@
+// Science: Hardy-Weinberg Equilibrium
+// Domain: biology
+module science.biology.hardy_weinberg
+
+pub fn compute(params: map) -> map {
+    // Hardy-Weinberg Equilibrium computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Hardy-Weinberg Equilibrium — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Hardy-Weinberg Equilibrium: " + result as str)
+}

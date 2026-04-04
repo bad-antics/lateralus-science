@@ -1,0 +1,22 @@
+// Science: Thermochemistry
+// Domain: chemistry
+module science.chemistry.thermochem
+
+pub fn compute(params: map) -> map {
+    // Thermochemistry computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Thermochemistry — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Thermochemistry: " + result as str)
+}

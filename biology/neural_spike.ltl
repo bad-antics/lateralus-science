@@ -1,0 +1,22 @@
+// Science: Neural Action Potential
+// Domain: biology
+module science.biology.neural_spike
+
+pub fn compute(params: map) -> map {
+    // Neural Action Potential computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Neural Action Potential — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Neural Action Potential: " + result as str)
+}

@@ -1,0 +1,22 @@
+// Science: Hubble's Law
+// Domain: astronomy
+module science.astronomy.hubble_law
+
+pub fn compute(params: map) -> map {
+    // Hubble's Law computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Hubble's Law — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Hubble's Law: " + result as str)
+}

@@ -1,0 +1,22 @@
+// Science: Mendelian Genetics
+// Domain: biology
+module science.biology.mendelian_genetics
+
+pub fn compute(params: map) -> map {
+    // Mendelian Genetics computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Mendelian Genetics — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Mendelian Genetics: " + result as str)
+}

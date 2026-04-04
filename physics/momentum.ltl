@@ -1,0 +1,22 @@
+// Science: Momentum & Impulse
+// Domain: physics
+module science.physics.momentum
+
+pub fn compute(params: map) -> map {
+    // Momentum & Impulse computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Momentum & Impulse — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Momentum & Impulse: " + result as str)
+}

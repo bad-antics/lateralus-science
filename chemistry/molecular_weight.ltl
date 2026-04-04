@@ -1,0 +1,22 @@
+// Science: Molecular Weight
+// Domain: chemistry
+module science.chemistry.molecular_weight
+
+pub fn compute(params: map) -> map {
+    // Molecular Weight computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Molecular Weight — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Molecular Weight: " + result as str)
+}

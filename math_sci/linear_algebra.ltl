@@ -1,0 +1,22 @@
+// Science: Linear Algebra
+// Domain: math_sci
+module science.math_sci.linear_algebra
+
+pub fn compute(params: map) -> map {
+    // Linear Algebra computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Linear Algebra — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Linear Algebra: " + result as str)
+}

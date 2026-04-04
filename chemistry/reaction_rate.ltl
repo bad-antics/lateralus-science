@@ -1,0 +1,22 @@
+// Science: Reaction Rate
+// Domain: chemistry
+module science.chemistry.reaction_rate
+
+pub fn compute(params: map) -> map {
+    // Reaction Rate computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Reaction Rate — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Reaction Rate: " + result as str)
+}

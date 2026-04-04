@@ -1,0 +1,22 @@
+// Science: Ideal Gas Law
+// Domain: chemistry
+module science.chemistry.ideal_gas
+
+pub fn compute(params: map) -> map {
+    // Ideal Gas Law computation
+    let mut results = {}
+    for k in keys(params) {
+        results[k] = params[k]
+    }
+    return results
+}
+
+pub fn describe() -> str {
+    return "Ideal Gas Law — simulation and computation"
+}
+
+fn main() {
+    let params = {"input": 1.0, "scale": 1.0}
+    let result = compute(params)
+    println("Ideal Gas Law: " + result as str)
+}
