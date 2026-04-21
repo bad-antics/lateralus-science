@@ -1,22 +1,113 @@
-// Science: Probability Distributions
-// Domain: math_sci
+// Probability distributions — PDFs, CDFs, and inverse CDFs.
+//
+// Included: Uniform, Exponential, Normal (Gaussian), Binomial, Poisson.
+//
+// For Normal N(μ,σ²):
+//   φ(x) = (1 / (σ√(2π))) · exp(−(x−μ)² / (2σ²))
+//   Φ(x) = 0.5·(1 + erf((x−μ) / (σ√2)))
+//   Φ⁻¹ uses the Beasley-Springer-Moro rational approximation.
+//
+// Binomial: P(X=k) = C(n,k) p^k (1-p)^(n-k)
+// Poisson:  P(X=k) = e^(−λ) · λ^k / k!
+// Exponential: PDF = λ·e^(−λx);  CDF = 1 − e^(−λx);  Q(p) = −ln(1−p)/λ.
+
 module science.math_sci.probability_dist
 
-pub fn compute(params: map) -> map {
-    // Probability Distributions computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const SQRT_2PI: float = 2.5066282746310002
+pub const SQRT_2: float = 1.4142135623730951
+
+// ---- Uniform(a,b) ----
+pub fn uniform_pdf(a: float, b: float, x: float) -> float {
+    return if x >= a && x <= b { 1.0 / (b - a) } else { 0.0 }
+}
+pub fn uniform_cdf(a: float, b: float, x: float) -> float {
+    if x < a { return 0.0 }
+    if x > b { return 1.0 }
+    return (x - a) / (b - a)
 }
 
-pub fn describe() -> str {
-    return "Probability Distributions — simulation and computation"
+// ---- Exponential(λ) ----
+pub fn exp_pdf(lam: float, x: float) -> float {
+    return if x < 0.0 { 0.0 } else { lam * exp_f(-lam * x) }
 }
+pub fn exp_cdf(lam: float, x: float) -> float {
+    return if x < 0.0 { 0.0 } else { 1.0 - exp_f(-lam * x) }
+}
+pub fn exp_quantile(lam: float, p: float) -> float {
+    return -ln(1.0 - p) / lam
+}
+
+// ---- Normal(μ,σ²) ----
+pub fn normal_pdf(mu: float, sigma: float, x: float) -> float {
+    let z = (x - mu) / sigma
+    return exp_f(-0.5 * z * z) / (sigma * SQRT_2PI)
+}
+pub fn normal_cdf(mu: float, sigma: float, x: float) -> float {
+    return 0.5 * (1.0 + erf((x - mu) / (sigma * SQRT_2)))
+}
+/// Beasley-Springer-Moro inverse normal; valid for 0.02 < p < 0.98 well.
+pub fn normal_quantile(mu: float, sigma: float, p: float) -> float {
+    return mu + sigma * inv_std_normal(p)
+}
+
+// ---- Binomial(n,p) ----
+pub fn binomial_pmf(n: int, p: float, k: int) -> float {
+    if k < 0 || k > n { return 0.0 }
+    return binom_coeff(n, k) * pow(p, k as float) * pow(1.0 - p, (n - k) as float)
+}
+pub fn binomial_mean(n: int, p: float) -> float { return (n as float) * p }
+pub fn binomial_var(n: int, p: float) -> float  { return (n as float) * p * (1.0 - p) }
+
+// ---- Poisson(λ) ----
+pub fn poisson_pmf(lam: float, k: int) -> float {
+    if k < 0 { return 0.0 }
+    return exp_f(-lam) * pow(lam, k as float) / factorial(k)
+}
+
+// ---- kernels ----
+fn erf(x: float) -> float {
+    // Abramowitz & Stegun 7.1.26 with max error ~1.5e-7.
+    let a1 =  0.254829592; let a2 = -0.284496736; let a3 =  1.421413741
+    let a4 = -1.453152027; let a5 =  1.061405429; let p  =  0.3275911
+    let sign = if x < 0.0 { -1.0 } else { 1.0 }
+    let ax = if x < 0.0 { -x } else { x }
+    let t = 1.0 / (1.0 + p * ax)
+    let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp_f(-ax * ax)
+    return sign * y
+}
+fn inv_std_normal(p: float) -> float {
+    // Moro (1995) rational approximation.
+    let a = [ 2.50662823884, -18.61500062529, 41.39119773534, -25.44106049637]
+    let b = [-8.47351093090,  23.08336743743,-21.06224101826,   3.13082909833]
+    let c = [0.3374754822726147,  0.9761690190917186,  0.1607979714918209,
+             0.0276438810333863,  0.0038405729373609,  0.0003951896511919,
+             0.0000321767881768,  0.0000002888167364,  0.0000003960315187]
+    let y = p - 0.5
+    if abs_f(y) < 0.42 {
+        let r = y * y
+        let num = ((a[3]*r + a[2])*r + a[1])*r + a[0]
+        let den = (((b[3]*r + b[2])*r + b[1])*r + b[0])*r + 1.0
+        return y * num / den
+    }
+    let r = if y > 0.0 { 1.0 - p } else { p }
+    let s = ln(-ln(r))
+    let mut t = c[0]
+    let mut i = 1
+    while i < 9 {
+        t += c[i] * pow(s, i as float)
+        i += 1
+    }
+    return if y < 0.0 { -t } else { t }
+}
+fn exp_f(x: float) -> float { let ln2 = 0.6931471805599453; let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }; let r = x - (n as float) * ln2; let mut t = 1.0; let mut s = 1.0; let mut k = 1; while k < 25 { t = t * r / (k as float); s += t; k += 1 }; let mag = if n < 0 { -n } else { n }; let mut p = 1.0; let mut i = 0; while i < mag { p = p * 2.0; i += 1 }; if n < 0 { p = 1.0 / p }; return s * p }
+fn ln(x: float) -> float { let ln2 = 0.6931471805599453; let mut m = x; let mut k = 0.0; while m >= 2.0 { m = m / 2.0; k += 1.0 }; while m < 1.0 { m = m * 2.0; k -= 1.0 }; let u = (m - 1.0) / (m + 1.0); let u2 = u * u; let mut term = u; let mut sum = 0.0; let mut n = 1; while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }; return k * ln2 + 2.0 * sum }
+fn pow(x: float, y: float) -> float { if x == 0.0 { return 0.0 }; return exp_f(y * ln(x)) }
+fn binom_coeff(n: int, k: int) -> float { let mut r = 1.0; let mut i = 0; let kk = if k > n - k { n - k } else { k }; while i < kk { r = r * ((n - i) as float) / ((i + 1) as float); i += 1 }; return r }
+fn factorial(n: int) -> float { let mut p = 1.0; let mut i = 2; while i <= n { p = p * (i as float); i += 1 }; return p }
+fn abs_f(x: float) -> float { return if x < 0.0 { -x } else { x } }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Probability Distributions: " + result as str)
+    println("Φ(1.96) = " + normal_cdf(0.0, 1.0, 1.96) as str)          // ~0.975
+    println("Φ⁻¹(0.975) = " + normal_quantile(0.0, 1.0, 0.975) as str) // ~1.96
+    println("Binom(10, 0.3) P(X=3) = " + binomial_pmf(10, 0.3, 3) as str)   // 0.267
 }
