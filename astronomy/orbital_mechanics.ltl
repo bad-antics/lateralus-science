@@ -1,22 +1,79 @@
-// Science: Orbital Mechanics
-// Domain: astronomy
+// Orbital mechanics — two-body problem helpers.
+//
+// Given the gravitational parameter μ = G·M of the primary and the
+// orbital state (position r, velocity v) of a satellite, we can
+// derive all classical orbital elements:
+//   • Specific orbital energy ε = v²/2 − μ/r  (constant of motion)
+//   • Semi-major axis          a = -μ/(2ε)
+//   • Eccentricity vector      e = (v×h)/μ − r̂   with h = r × v
+//   • Eccentricity             e = |e|
+//   • Orbital period           T = 2π √(a³/μ)  (elliptical only)
+//
+// Used in: spacecraft trajectory design (Hohmann, bi-elliptic transfer,
+// Lambert's problem), mission planning (NASA JPL Horizons, ESA
+// Mission Analysis), TLE parsing for satellite tracking (SGP4).
+
 module science.astronomy.orbital_mechanics
 
-pub fn compute(params: map) -> map {
-    // Orbital Mechanics computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const G: float = 6.674e-11
+pub const PI: float = 3.141592653589793
+
+pub struct State { pub rx: float, pub ry: float, pub rz: float,
+                   pub vx: float, pub vy: float, pub vz: float }
+
+pub struct Elements {
+    pub a: float, pub e: float, pub eps: float, pub period_s: float,
 }
 
-pub fn describe() -> str {
-    return "Orbital Mechanics — simulation and computation"
+pub fn gravitational_parameter(mass_kg: float) -> float { return G * mass_kg }
+
+pub fn specific_energy(s: State, mu: float) -> float {
+    let r = sqrt(s.rx * s.rx + s.ry * s.ry + s.rz * s.rz)
+    let v2 = s.vx * s.vx + s.vy * s.vy + s.vz * s.vz
+    return v2 / 2.0 - mu / r
 }
+
+pub fn angular_momentum(s: State) -> (float, float, float) {
+    return (
+        s.ry * s.vz - s.rz * s.vy,
+        s.rz * s.vx - s.rx * s.vz,
+        s.rx * s.vy - s.ry * s.vx,
+    )
+}
+
+pub fn elements_from_state(s: State, mu: float) -> Elements {
+    let eps = specific_energy(s, mu)
+    let a = -mu / (2.0 * eps)
+    // Eccentricity magnitude from energy + angular momentum.
+    let (hx, hy, hz) = angular_momentum(s)
+    let h2 = hx * hx + hy * hy + hz * hz
+    let e = sqrt(1.0 + 2.0 * eps * h2 / (mu * mu))
+    let period = if eps < 0.0 { 2.0 * PI * sqrt(a * a * a / mu) } else { -1.0 }
+    return Elements { a: a, e: e, eps: eps, period_s: period }
+}
+
+/// Circular orbit speed at radius r: v_c = √(μ/r).
+pub fn circular_orbit_speed(mu: float, r_m: float) -> float {
+    return sqrt(mu / r_m)
+}
+
+/// Hohmann transfer Δv total (for two-impulse coplanar circular-to-
+/// circular transfer between radii r1 and r2).
+pub fn hohmann_dv(mu: float, r1: float, r2: float) -> float {
+    let v1 = sqrt(mu / r1)
+    let v2 = sqrt(mu / r2)
+    let a_t = (r1 + r2) / 2.0
+    let v_peri = sqrt(mu * (2.0 / r1 - 1.0 / a_t))
+    let v_apo  = sqrt(mu * (2.0 / r2 - 1.0 / a_t))
+    return abs(v_peri - v1) + abs(v2 - v_apo)
+}
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
+fn abs(x: float) -> float { return if x < 0.0 { -x } else { x } }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Orbital Mechanics: " + result as str)
+    let mu = gravitational_parameter(5.972e24)
+    let iss = State { rx: 6_771_000.0, ry: 0.0, rz: 0.0, vx: 0.0, vy: 7660.0, vz: 0.0 }
+    let el = elements_from_state(iss, mu)
+    println("ISS-like period: " + (el.period_s / 60.0) as str + " min")   // ~93
 }
