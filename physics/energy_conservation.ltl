@@ -1,22 +1,73 @@
-// Science: Energy Conservation
-// Domain: physics
+// Conservation of energy — the first law of thermodynamics in mechanics.
+//
+//   E_total = KE + PE + E_internal  =  constant   (closed system)
+//
+// In classical mechanics, absent friction/dissipation:
+//   ½·m·v₁² + m·g·h₁ = ½·m·v₂² + m·g·h₂
+//
+// Elastic collision (1-D, two bodies):
+//     v1' = ((m1 − m2)·v1 + 2·m2·v2) / (m1 + m2)
+//     v2' = ((m2 − m1)·v2 + 2·m1·v1) / (m1 + m2)
+// Inelastic (perfectly stuck):
+//     v' = (m1·v1 + m2·v2) / (m1 + m2)   — momentum conserved, KE not
+// Coefficient of restitution e ∈ [0,1]:
+//     e = |v2' − v1'| / |v1 − v2|
+
 module science.physics.energy_conservation
 
-pub fn compute(params: map) -> map {
-    // Energy Conservation computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const G_EARTH: float = 9.80665
+
+pub fn kinetic(mass: float, v: float) -> float { return 0.5 * mass * v * v }
+pub fn gravitational_pe(mass: float, h: float, g: float) -> float { return mass * g * h }
+pub fn spring_pe(k: float, x: float) -> float { return 0.5 * k * x * x }
+
+pub fn mechanical_energy(mass: float, v: float, h: float, g: float) -> float {
+    return kinetic(mass, v) + gravitational_pe(mass, h, g)
 }
 
-pub fn describe() -> str {
-    return "Energy Conservation — simulation and computation"
+/// Final speed when dropped from rest through height h (no friction).
+pub fn speed_from_height(h: float, g: float) -> float { return sqrt(2.0 * g * h) }
+
+/// Height reached by projectile of initial speed v (at launch angle = π/2).
+pub fn height_from_speed(v: float, g: float) -> float { return v * v / (2.0 * g) }
+
+pub struct CollisionResult { pub v1: float, pub v2: float }
+
+pub fn elastic_1d(m1: float, v1: float, m2: float, v2: float) -> CollisionResult {
+    let sum = m1 + m2
+    return CollisionResult {
+        v1: ((m1 - m2) * v1 + 2.0 * m2 * v2) / sum,
+        v2: ((m2 - m1) * v2 + 2.0 * m1 * v1) / sum,
+    }
 }
+
+pub fn perfectly_inelastic_1d(m1: float, v1: float, m2: float, v2: float) -> float {
+    return (m1 * v1 + m2 * v2) / (m1 + m2)
+}
+
+/// Partially inelastic: coefficient of restitution e ∈ [0,1].
+pub fn restitution_1d(m1: float, v1: float, m2: float, v2: float, e: float) -> CollisionResult {
+    let sum = m1 + m2
+    let vcom = (m1 * v1 + m2 * v2) / sum
+    return CollisionResult {
+        v1: vcom + (m2 / sum) * e * (v2 - v1),
+        v2: vcom + (m1 / sum) * e * (v1 - v2),
+    }
+}
+
+pub fn energy_dissipated(m1: float, v1_i: float, v1_f: float,
+                          m2: float, v2_i: float, v2_f: float) -> float {
+    let ki = kinetic(m1, v1_i) + kinetic(m2, v2_i)
+    let kf = kinetic(m1, v1_f) + kinetic(m2, v2_f)
+    return ki - kf
+}
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Energy Conservation: " + result as str)
+    // Ball drop from 5 m: v = sqrt(2gh) ≈ 9.9 m/s
+    println("v after 5 m drop: " + speed_from_height(5.0, G_EARTH) as str)
+    // Equal-mass elastic: velocities swap.
+    let r = elastic_1d(1.0, 3.0, 1.0, 0.0)
+    println("Elastic swap: v1'=" + r.v1 as str + " v2'=" + r.v2 as str)
 }
