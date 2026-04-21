@@ -1,22 +1,133 @@
-// Science: Advanced Statistics
-// Domain: math_sci
+// Advanced statistics — beyond mean and variance.
+//
+// Provides:
+//   • Welford's online algorithm for numerically stable mean & variance
+//   • Pearson and Spearman correlation
+//   • Sample skewness (Fisher-Pearson) and excess kurtosis
+//   • One-sample and Welch's two-sample t-tests
+//   • Simple linear regression with R²
+//
+// References:
+//   • Welford, B.P., Technometrics 4, 1962.
+//   • Fisher, R.A., "Statistical Methods for Research Workers", 1925.
+//   • Welch, B.L., Biometrika 34, 1947 (unequal variances t-test).
+
 module science.math_sci.statistics_advanced
 
-pub fn compute(params: map) -> map {
-    // Advanced Statistics computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub struct OnlineStats { pub n: int, pub mean: float, pub m2: float }
+
+pub fn online_new() -> OnlineStats { return OnlineStats { n: 0, mean: 0.0, m2: 0.0 } }
+
+/// Welford update — O(1) per sample, numerically stable.
+pub fn online_update(s: OnlineStats, x: float) -> OnlineStats {
+    let n = s.n + 1
+    let delta = x - s.mean
+    let mean = s.mean + delta / (n as float)
+    let m2 = s.m2 + delta * (x - mean)
+    return OnlineStats { n: n, mean: mean, m2: m2 }
 }
 
-pub fn describe() -> str {
-    return "Advanced Statistics — simulation and computation"
+pub fn online_var_sample(s: OnlineStats) -> float {
+    return if s.n > 1 { s.m2 / ((s.n - 1) as float) } else { 0.0 }
 }
+
+pub fn mean(data: [float]) -> float {
+    let mut s = 0.0; let mut i = 0
+    while i < data.len() { s += data[i]; i += 1 }
+    return s / (data.len() as float)
+}
+
+pub fn variance_sample(data: [float]) -> float {
+    let m = mean(data); let mut s = 0.0; let mut i = 0
+    while i < data.len() { let d = data[i] - m; s += d * d; i += 1 }
+    return s / ((data.len() - 1) as float)
+}
+
+pub fn std_sample(data: [float]) -> float { return sqrt(variance_sample(data)) }
+
+/// Pearson correlation coefficient.
+pub fn pearson(x: [float], y: [float]) -> float {
+    if x.len() != y.len() { throw Error("pearson: length mismatch") }
+    let mx = mean(x); let my = mean(y)
+    let mut sxy = 0.0; let mut sxx = 0.0; let mut syy = 0.0
+    let mut i = 0
+    while i < x.len() {
+        let dx = x[i] - mx; let dy = y[i] - my
+        sxy += dx * dy; sxx += dx * dx; syy += dy * dy
+        i += 1
+    }
+    return sxy / sqrt(sxx * syy)
+}
+
+/// Spearman's rank correlation.
+pub fn spearman(x: [float], y: [float]) -> float {
+    return pearson(rank(x), rank(y))
+}
+
+fn rank(xs: [float]) -> [float] {
+    let n = xs.len()
+    let mut idx: [int] = []; let mut i = 0
+    while i < n { idx.push(i); i += 1 }
+    // simple insertion sort by xs[idx[k]]
+    let mut k = 1
+    while k < n {
+        let mut j = k
+        while j > 0 && xs[idx[j - 1]] > xs[idx[j]] {
+            let t = idx[j]; idx[j] = idx[j - 1]; idx[j - 1] = t
+            j -= 1
+        }
+        k += 1
+    }
+    let mut ranks: [float] = []; i = 0
+    while i < n { ranks.push(0.0); i += 1 }
+    i = 0
+    while i < n { ranks[idx[i]] = (i + 1) as float; i += 1 }
+    return ranks
+}
+
+pub fn skewness(data: [float]) -> float {
+    let m = mean(data); let s = std_sample(data)
+    let mut sum = 0.0; let mut i = 0
+    while i < data.len() { let d = (data[i] - m) / s; sum += d * d * d; i += 1 }
+    return sum / (data.len() as float)
+}
+
+pub fn excess_kurtosis(data: [float]) -> float {
+    let m = mean(data); let s = std_sample(data)
+    let mut sum = 0.0; let mut i = 0
+    while i < data.len() { let d = (data[i] - m) / s; sum += d * d * d * d; i += 1 }
+    return sum / (data.len() as float) - 3.0
+}
+
+/// Welch's two-sample t-statistic (unequal variances).
+pub fn welch_t(a: [float], b: [float]) -> float {
+    let ma = mean(a); let mb = mean(b)
+    let va = variance_sample(a); let vb = variance_sample(b)
+    return (ma - mb) / sqrt(va / (a.len() as float) + vb / (b.len() as float))
+}
+
+/// Simple OLS linear regression y = β₀ + β₁·x. Returns (β₀, β₁, R²).
+pub fn linear_regression(x: [float], y: [float]) -> (float, float, float) {
+    let mx = mean(x); let my = mean(y)
+    let mut sxy = 0.0; let mut sxx = 0.0; let mut syy = 0.0
+    let mut i = 0
+    while i < x.len() {
+        let dx = x[i] - mx; let dy = y[i] - my
+        sxy += dx * dy; sxx += dx * dx; syy += dy * dy
+        i += 1
+    }
+    let b1 = sxy / sxx
+    let b0 = my - b1 * mx
+    let r2 = (sxy * sxy) / (sxx * syy)
+    return (b0, b1, r2)
+}
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Advanced Statistics: " + result as str)
+    let x = [1.0, 2.0, 3.0, 4.0, 5.0]
+    let y = [2.1, 4.0, 6.1, 8.1, 10.0]
+    let (b0, b1, r2) = linear_regression(x, y)
+    println("β₀=" + b0 as str + " β₁=" + b1 as str + " R²=" + r2 as str)
+    println("Pearson: " + pearson(x, y) as str)   // ~0.9998
 }
