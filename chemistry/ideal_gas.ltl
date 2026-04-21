@@ -1,22 +1,50 @@
-// Science: Ideal Gas Law
-// Domain: chemistry
+// Ideal gas law — PV = nRT.
+//
+// Limiting-case equation of state for dilute gases; derived from
+// kinetic theory (Clausius, Maxwell, Boltzmann). Each molecule is
+// a point with no intermolecular forces; collisions are elastic.
+//
+// Units used here (SI):
+//   P — Pa     V — m³    n — mol    T — K
+//   R = 8.314 462 618 J/(mol·K)
+//
+// Real-gas corrections:
+//   • van der Waals:  (P + a·n²/V²)·(V − n·b) = n·R·T
+//   • Redlich-Kwong, Peng-Robinson (used in process engineering).
+// Validity of ideal-gas assumption: low P, high T, far from liquefaction.
+
 module science.chemistry.ideal_gas
 
-pub fn compute(params: map) -> map {
-    // Ideal Gas Law computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const R: float = 8.314462618            // J/(mol·K)
+pub const N_A: float = 6.02214076e23        // molecules/mol
+pub const T_STP: float = 273.15             // K (0 °C)
+pub const P_STP: float = 101_325.0          // Pa (1 atm)
+
+pub fn pressure(n: float, t: float, v: float) -> float    { return n * R * t / v }
+pub fn volume(n: float, t: float, p: float) -> float      { return n * R * t / p }
+pub fn moles(p: float, v: float, t: float) -> float       { return p * v / (R * t) }
+pub fn temperature(p: float, v: float, n: float) -> float { return p * v / (n * R) }
+
+/// Molar volume at standard temperature and pressure = 22.414 L.
+pub fn molar_volume_stp() -> float {
+    return R * T_STP / P_STP          // m³ (= 0.022414)
 }
 
-pub fn describe() -> str {
-    return "Ideal Gas Law — simulation and computation"
+/// Van der Waals equation — solve for P given n, V, T and constants a, b.
+pub fn van_der_waals_p(n: float, v: float, t: float, a: float, b: float) -> float {
+    return n * R * t / (v - n * b) - a * n * n / (v * v)
 }
+
+/// Root-mean-square molecular speed: v_rms = √(3RT/M).
+/// M in kg/mol (e.g. 0.028 for N₂).
+pub fn vrms(temperature_k: float, molar_mass: float) -> float {
+    return sqrt(3.0 * R * temperature_k / molar_mass)
+}
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Ideal Gas Law: " + result as str)
+    // 1 mole at STP:
+    println("V(STP) = " + volume(1.0, T_STP, P_STP) as str + " m³")   // 0.02241
+    println("v_rms N₂ @ 300 K: " + vrms(300.0, 0.028014) as str + " m/s")   // ~517
 }
