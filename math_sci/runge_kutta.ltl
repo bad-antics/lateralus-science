@@ -1,22 +1,116 @@
-// Science: Runge-Kutta 4th Order
-// Domain: math_sci
+// Runge-Kutta ODE integrators.
+//
+// Explicit s-stage RK for  dy/dt = f(t, y):
+//   k_i = f(t + c_i·h,  y + h·Σ_j a_{ij}·k_j)
+//   y_{n+1} = y_n + h·Σ_i b_i·k_i
+//
+// Implemented here: classical RK4 (Butcher 1901 / Kutta 1901) and
+// Dormand-Prince 5(4) adaptive step with PI-style error control.
+//
+// RK4 Butcher tableau:
+//     0   |
+//    1/2  | 1/2
+//    1/2  | 0    1/2
+//     1   | 0    0    1
+//    ─────+────────────────
+//         | 1/6  1/3  1/3  1/6
+//
+// Error per step O(h⁵); global O(h⁴). For stiff ODEs use implicit
+// methods (backward Euler, BDF) — not provided here.
+
 module science.math_sci.runge_kutta
 
-pub fn compute(params: map) -> map {
-    // Runge-Kutta 4th Order computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub type F1 = fn(float, float) -> float
+
+/// One RK4 step for scalar y.
+pub fn rk4_step(f: F1, t: float, y: float, h: float) -> float {
+    let k1 = f(t, y)
+    let k2 = f(t + 0.5 * h, y + 0.5 * h * k1)
+    let k3 = f(t + 0.5 * h, y + 0.5 * h * k2)
+    let k4 = f(t + h,       y + h * k3)
+    return y + h / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 }
 
-pub fn describe() -> str {
-    return "Runge-Kutta 4th Order — simulation and computation"
+/// Fixed-step RK4 on [t0, t_end] with n equal subintervals.
+pub fn rk4_fixed(f: F1, t0: float, y0: float, t_end: float, n: int) -> float {
+    let h = (t_end - t0) / (n as float)
+    let mut t = t0; let mut y = y0; let mut i = 0
+    while i < n { y = rk4_step(f, t, y, h); t += h; i += 1 }
+    return y
+}
+
+/// Dormand-Prince 5(4) single step; returns (y5, err_estimate).
+pub fn dopri5_step(f: F1, t: float, y: float, h: float) -> (float, float) {
+    let k1 = f(t, y)
+    let k2 = f(t + 1.0/5.0*h,  y + h*(1.0/5.0*k1))
+    let k3 = f(t + 3.0/10.0*h, y + h*(3.0/40.0*k1 + 9.0/40.0*k2))
+    let k4 = f(t + 4.0/5.0*h,  y + h*(44.0/45.0*k1 - 56.0/15.0*k2 + 32.0/9.0*k3))
+    let k5 = f(t + 8.0/9.0*h,  y + h*(19372.0/6561.0*k1 - 25360.0/2187.0*k2
+                                        + 64448.0/6561.0*k3 - 212.0/729.0*k4))
+    let k6 = f(t + h,           y + h*(9017.0/3168.0*k1 - 355.0/33.0*k2
+                                        + 46732.0/5247.0*k3 + 49.0/176.0*k4
+                                        - 5103.0/18656.0*k5))
+    let y5 = y + h*(35.0/384.0*k1 + 500.0/1113.0*k3 + 125.0/192.0*k4
+                    - 2187.0/6784.0*k5 + 11.0/84.0*k6)
+    let k7 = f(t + h, y5)
+    // error = y5 - y4 using embedded 4th-order weights
+    let err_y = h*((35.0/384.0 - 5179.0/57600.0)*k1
+                 + (500.0/1113.0 - 7571.0/16695.0)*k3
+                 + (125.0/192.0  -   393.0/640.0)*k4
+                 + (-2187.0/6784.0 + 92097.0/339200.0)*k5
+                 + (11.0/84.0 - 187.0/2100.0)*k6
+                 + (-1.0/40.0)*k7)
+    return (y5, abs(err_y))
+}
+
+/// Adaptive solver over [t0,t_end] with relative/absolute tolerances.
+pub fn dopri5_solve(f: F1, t0: float, y0: float, t_end: float,
+                     rtol: float, atol: float) -> float {
+    let mut t = t0; let mut y = y0
+    let mut h = 0.01 * (t_end - t0)
+    while t < t_end {
+        if t + h > t_end { h = t_end - t }
+        let (y_new, err) = dopri5_step(f, t, y, h)
+        let sc = atol + rtol * max(abs(y), abs(y_new))
+        let ratio = err / sc
+        if ratio <= 1.0 {
+            t += h; y = y_new
+            let s = if ratio < 1e-12 { 5.0 } else { 0.9 * pow(1.0 / ratio, 0.2) }
+            h = h * min(5.0, max(0.2, s))
+        } else {
+            h = h * max(0.1, 0.9 * pow(1.0 / ratio, 0.2))
+        }
+    }
+    return y
+}
+
+fn abs(x: float) -> float { return if x < 0.0 { -x } else { x } }
+fn min(a: float, b: float) -> float { return if a < b { a } else { b } }
+fn max(a: float, b: float) -> float { return if a > b { a } else { b } }
+fn pow(x: float, y: float) -> float {
+    let ln2 = 0.6931471805599453
+    let mut m = x; let mut k = 0.0
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }
+    let lnx = k * ln2 + 2.0 * sum
+    let xy = y * lnx
+    let nn = if xy >= 0.0 { (xy / ln2 + 0.5) as int } else { (xy / ln2 - 0.5) as int }
+    let r = xy - (nn as float) * ln2
+    let mut t = 1.0; let mut s = 1.0; let mut kk = 1
+    while kk < 25 { t = t * r / (kk as float); s += t; kk += 1 }
+    let mag = if nn < 0 { -nn } else { nn }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if nn < 0 { p = 1.0 / p }
+    return s * p
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Runge-Kutta 4th Order: " + result as str)
+    // y' = y, y(0) = 1  →  y(1) = e ≈ 2.71828
+    let f: F1 = |t, y| y
+    println("RK4:    " + rk4_fixed(f, 0.0, 1.0, 1.0, 100) as str)
+    println("DOPRI5: " + dopri5_solve(f, 0.0, 1.0, 1.0, 1e-8, 1e-10) as str)
 }
