@@ -1,22 +1,87 @@
-// Science: pH Calculator
-// Domain: chemistry
+// pH — power of hydrogen (Sørensen, 1909).
+//
+//     pH  = −log₁₀([H⁺])        (aq, 25 °C)
+//     pOH = −log₁₀([OH⁻])
+//     pH + pOH = pK_w = 14.000  (25 °C; temperature-dependent)
+//
+// Strong acid/base: [H⁺] ≈ C_acid (or K_w/C_base if basic).
+// Weak acid dissociation:
+//     K_a = [H⁺][A⁻] / [HA]        pK_a = −log₁₀ K_a
+// Henderson-Hasselbalch for buffers:
+//     pH = pK_a + log₁₀([A⁻]/[HA])
+// Water autoionization K_w = 1.0×10⁻¹⁴ at 25 °C (neutral pH = 7).
+
 module science.chemistry.ph_calculator
 
-pub fn compute(params: map) -> map {
-    // pH Calculator computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const KW: float = 1.0e-14
+
+pub fn ph_from_h(h_plus_conc: float) -> float {
+    if h_plus_conc <= 0.0 { throw Error("[H+] must be > 0") }
+    return -log10(h_plus_conc)
 }
 
-pub fn describe() -> str {
-    return "pH Calculator — simulation and computation"
+pub fn h_from_ph(ph: float) -> float { return pow10(-ph) }
+
+pub fn poh_from_oh(oh_conc: float) -> float { return -log10(oh_conc) }
+
+pub fn ph_from_poh(poh: float) -> float { return 14.0 - poh }
+
+/// Weak acid pH via ICE-table quadratic root (exact).
+///   K_a = x² / (C − x)  ⇒  x² + K_a·x − K_a·C = 0
+pub fn weak_acid_ph(ca: float, ka: float) -> float {
+    let disc = ka * ka + 4.0 * ka * ca
+    let x = (-ka + sqrt(disc)) / 2.0       // [H⁺]
+    return ph_from_h(x)
 }
+
+/// Henderson-Hasselbalch buffer pH.
+pub fn buffer_ph(pka: float, conj_base: float, acid: float) -> float {
+    if acid <= 0.0 || conj_base <= 0.0 { throw Error("concs must be > 0") }
+    return pka + log10(conj_base / acid)
+}
+
+/// Strong acid pH (assuming C ≫ 10⁻⁷, so water contribution negligible).
+pub fn strong_acid_ph(concentration: float) -> float {
+    return ph_from_h(concentration)
+}
+
+// ---- math ----
+fn log10(x: float) -> float {
+    let ln10 = 2.302585092994046
+    return ln(x) / ln10
+}
+fn pow10(x: float) -> float {
+    let ln10 = 2.302585092994046
+    return exp(x * ln10)
+}
+fn ln(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let mut m = x; let mut k = 0.0
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 40 { sum += term / (n as float); term = term * u2; n += 2 }
+    return k * ln2 + 2.0 * sum
+}
+fn exp(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }
+    let r = x - (n as float) * ln2
+    let mut t = 1.0; let mut s = 1.0; let mut k = 1
+    while k < 30 { t = t * r / (k as float); s += t; k += 1 }
+    let mag = if n < 0 { -n } else { n }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if n < 0 { p = 1.0 / p }
+    return s * p
+}
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("pH Calculator: " + result as str)
+    println("pH of 0.01 M HCl: " + strong_acid_ph(0.01) as str)                  // 2.0
+    println("pH of 0.1 M acetic (pKa 4.76): " +
+             weak_acid_ph(0.1, pow10(-4.76)) as str)                             // ~2.88
+    println("Acetate buffer 1:1, pKa 4.76: " +
+             buffer_ph(4.76, 1.0, 1.0) as str)                                    // 4.76
 }
