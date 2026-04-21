@@ -1,22 +1,95 @@
-// Science: Stellar Magnitude
-// Domain: astronomy
+// Stellar magnitudes — apparent, absolute, and the distance modulus.
+//
+// Pogson (1856): a difference of 5 mag ≡ a brightness ratio of exactly 100×.
+// So one magnitude = 100^(1/5) ≈ 2.5119 brightness ratio. SMALLER
+// magnitude = brighter. Vega is (by historical definition) m ≈ 0 in
+// all bands; modern zero-points use the AB system.
+//
+// Apparent magnitude m: how bright a star appears from Earth.
+// Absolute magnitude M: apparent magnitude at 10 parsecs.
+// Distance modulus:  m − M = 5·log₁₀(d/10 pc)
+//
+// Used everywhere in observational astronomy: cosmic distance ladder
+// (Cepheids, Type-Ia SNe), Hertzsprung-Russell diagrams, photometric
+// selection in surveys.
+
 module science.astronomy.stellar_magnitude
 
-pub fn compute(params: map) -> map {
-    // Stellar Magnitude computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const POGSON_RATIO: float = 2.511886431509580        // 10^0.4
+
+/// Convert brightness ratio (F₁/F₂) to magnitude difference.
+///     m₂ − m₁ = 2.5 · log₁₀(F₁/F₂)
+pub fn mag_diff_from_flux_ratio(flux_ratio: float) -> float {
+    return 2.5 * log10(flux_ratio)
 }
 
-pub fn describe() -> str {
-    return "Stellar Magnitude — simulation and computation"
+/// Ratio of fluxes from a magnitude difference (F₁/F₂).
+pub fn flux_ratio_from_mag_diff(delta_m: float) -> float {
+    return pow10(0.4 * delta_m)
+}
+
+/// Distance modulus: μ = m − M = 5·log₁₀(d/pc) − 5.
+pub fn distance_modulus(distance_pc: float) -> float {
+    return 5.0 * log10(distance_pc) - 5.0
+}
+
+/// Absolute magnitude M given apparent m and distance in pc.
+pub fn absolute_magnitude(apparent_m: float, distance_pc: float) -> float {
+    return apparent_m - distance_modulus(distance_pc)
+}
+
+/// Distance (pc) from m and M.
+pub fn distance_pc_from_magnitudes(apparent_m: float, absolute_m: float) -> float {
+    return pow10((apparent_m - absolute_m + 5.0) / 5.0)
+}
+
+// ---- transcendental helpers ----
+fn log10(x: float) -> float {
+    if x <= 0.0 { throw Error("log10: non-positive") }
+    // log10(x) = ln(x) / ln(10). Use series via sqrt scaling.
+    // ln(x): argument reduction x → m·2^k with m ∈ [1,2), then series.
+    let mut k = 0.0; let mut m = x
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    // ln(m) via 2·atanh((m-1)/(m+1)) series.
+    let u = (m - 1.0) / (m + 1.0)
+    let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 {
+        sum += term / (n as float)
+        term = term * u2
+        n += 2
+    }
+    let ln_m = 2.0 * sum
+    let ln2  = 0.6931471805599453
+    let ln10 = 2.302585092994046
+    return (k * ln2 + ln_m) / ln10
+}
+
+fn pow10(x: float) -> float {
+    // 10^x = e^(x·ln10). e^y via Taylor expansion with argument
+    // reduction y → y − n·ln2 so |y'| ≤ ln2/2.
+    let ln10 = 2.302585092994046
+    let ln2  = 0.6931471805599453
+    let y = x * ln10
+    let n = round_to_int(y / ln2)
+    let r = y - (n as float) * ln2
+    let mut term = 1.0; let mut sum = 1.0; let mut k = 1
+    while k < 20 { term = term * r / (k as float); sum += term; k += 1 }
+    // 2^n
+    let mut pow2 = 1.0; let mut i = 0
+    while i < (if n < 0 { -n } else { n }) { pow2 = pow2 * 2.0; i += 1 }
+    if n < 0 { pow2 = 1.0 / pow2 }
+    return sum * pow2
+}
+
+fn round_to_int(x: float) -> int {
+    return if x >= 0.0 { (x + 0.5) as int } else { (x - 0.5) as int }
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Stellar Magnitude: " + result as str)
+    println("Sirius apparent -1.46, distance 2.64 pc → M = " +
+            absolute_magnitude(-1.46, 2.64) as str)   // ~1.42
+    println("Cepheid M=-5, m=15 → d = " +
+            distance_pc_from_magnitudes(15.0, -5.0) as str + " pc")   // 10^5 = 100 kpc
 }
