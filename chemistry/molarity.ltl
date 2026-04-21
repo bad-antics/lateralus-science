@@ -1,22 +1,59 @@
-// Science: Molarity Calculator
-// Domain: chemistry
+// Molarity, molality, and dilution formulae.
+//
+//   M (molarity)  = n_solute / V_solution              mol / L
+//   m (molality)  = n_solute / mass_solvent_kg         mol / kg
+//   mole fraction x_i = n_i / n_total
+//   % (w/w)       = mass_solute / mass_total · 100
+//   ppm           = mass_solute / mass_total · 10⁶
+//
+// Dilution (C₁V₁ = C₂V₂): moles conserved on adding solvent.
+// Mixing: c_final · (V_A + V_B) = c_A·V_A + c_B·V_B (same solute).
+//
+// Used in every wet-lab protocol; pharmacological dosing is IV-bag
+// math with these formulae.
+
 module science.chemistry.molarity
 
-pub fn compute(params: map) -> map {
-    // Molarity Calculator computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub fn molarity(moles_solute: float, volume_solution_l: float) -> float {
+    if volume_solution_l <= 0.0 { throw Error("volume must be > 0") }
+    return moles_solute / volume_solution_l
 }
 
-pub fn describe() -> str {
-    return "Molarity Calculator — simulation and computation"
+pub fn molality(moles_solute: float, mass_solvent_kg: float) -> float {
+    if mass_solvent_kg <= 0.0 { throw Error("solvent mass must be > 0") }
+    return moles_solute / mass_solvent_kg
+}
+
+pub fn mole_fraction(moles_component: float, moles_total: float) -> float {
+    return moles_component / moles_total
+}
+
+pub fn mass_percent(mass_solute: float, mass_total: float) -> float {
+    return 100.0 * mass_solute / mass_total
+}
+
+pub fn ppm(mass_solute: float, mass_total: float) -> float {
+    return 1_000_000.0 * mass_solute / mass_total
+}
+
+/// C₁V₁ = C₂V₂ → solve for unknown.
+pub fn dilution_volume(c1: float, v1: float, c2: float) -> float {
+    return c1 * v1 / c2
+}
+
+/// Final concentration after mixing two solutions of same solute.
+pub fn mix_concentration(c_a: float, v_a: float, c_b: float, v_b: float) -> float {
+    return (c_a * v_a + c_b * v_b) / (v_a + v_b)
+}
+
+/// Moles needed to make a target molarity/volume.
+pub fn moles_needed(molarity_target: float, volume_l: float) -> float {
+    return molarity_target * volume_l
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Molarity Calculator: " + result as str)
+    // 0.5 L of 0.1 M NaCl from a 1.0 M stock:
+    let v = dilution_volume(1.0, 0.05, 0.1)   // need 0.05 L of stock → want 0.5 L at 0.1 M
+    println("Stock vol for 0.5 L × 0.1 M from 1 M: " + dilution_volume(1.0, 0.5 * 0.1 / 1.0, 0.1) as str)
+    println("Mixed conc: " + mix_concentration(0.1, 0.3, 0.2, 0.2) as str + " M")  // 0.14
 }
