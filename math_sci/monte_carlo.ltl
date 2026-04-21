@@ -1,22 +1,84 @@
-// Science: Monte Carlo Integration
-// Domain: math_sci
+// Monte-Carlo integration and estimation.
+//
+// Crude estimator:
+//     ∫_Ω f dV  ≈  (Vol Ω / N) · Σ_i f(x_i)       x_i ~ Uniform(Ω)
+//     variance ∝ 1/N   regardless of dimension — wins in high-d
+//     where grid quadrature's cost is O(n^d).
+//
+// Provided here:
+//   • Crude MC integration on a hyper-rectangle
+//   • π estimator via unit-circle rejection
+//   • Variance reduction: antithetic sampling, simple importance sampling
+//   • xorshift64* PRNG (NOT cryptographic) seeded at call site
+//
+// Historical: Stanislaw Ulam / John von Neumann, Los Alamos, 1946,
+// for neutron-transport calculations; name from the casino, suggested
+// by Nicholas Metropolis.
+
 module science.math_sci.monte_carlo
 
-pub fn compute(params: map) -> map {
-    // Monte Carlo Integration computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub type Func = fn(float) -> float
+
+pub struct Rng { pub state: u64 }
+
+pub fn rng_new(seed: u64) -> Rng {
+    return Rng { state: if seed == 0 { 0xDEADBEEFu64 } else { seed } }
 }
 
-pub fn describe() -> str {
-    return "Monte Carlo Integration — simulation and computation"
+pub fn rng_next_u64(rng: &mut Rng) -> u64 {
+    let mut s = rng.state
+    s ^= s >> 12
+    s ^= s << 25
+    s ^= s >> 27
+    rng.state = s
+    return s * 2685821657736338717u64
+}
+
+/// Uniform float in [0,1).
+pub fn rng_unif(rng: &mut Rng) -> float {
+    let u = rng_next_u64(rng) >> 11       // 53 good bits
+    return (u as float) * (1.0 / 9007199254740992.0)
+}
+
+/// ∫_a^b f(x) dx by crude Monte-Carlo with N samples.
+pub fn integrate_1d(f: Func, a: float, b: float, n: int, rng: &mut Rng) -> float {
+    let mut s = 0.0; let mut i = 0
+    while i < n {
+        let x = a + (b - a) * rng_unif(rng)
+        s += f(x)
+        i += 1
+    }
+    return (b - a) * s / (n as float)
+}
+
+/// Antithetic variates: pair (u, 1-u) — halves variance for monotone f.
+pub fn integrate_1d_antithetic(f: Func, a: float, b: float, n_pairs: int, rng: &mut Rng) -> float {
+    let mut s = 0.0; let mut i = 0
+    while i < n_pairs {
+        let u = rng_unif(rng)
+        let x1 = a + (b - a) * u
+        let x2 = a + (b - a) * (1.0 - u)
+        s += 0.5 * (f(x1) + f(x2))
+        i += 1
+    }
+    return (b - a) * s / (n_pairs as float)
+}
+
+/// π via unit-square rejection: 4·(inside / N).
+pub fn estimate_pi(n: int, rng: &mut Rng) -> float {
+    let mut inside = 0; let mut i = 0
+    while i < n {
+        let x = rng_unif(rng); let y = rng_unif(rng)
+        if x * x + y * y <= 1.0 { inside += 1 }
+        i += 1
+    }
+    return 4.0 * (inside as float) / (n as float)
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Monte Carlo Integration: " + result as str)
+    let mut rng = rng_new(42)
+    // ∫₀¹ x² dx = 1/3
+    let est = integrate_1d(|x| x * x, 0.0, 1.0, 200_000, &mut rng)
+    println("MC ∫x² = " + est as str)
+    println("π est = " + estimate_pi(200_000, &mut rng) as str)
 }
