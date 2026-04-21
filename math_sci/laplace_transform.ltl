@@ -1,22 +1,98 @@
-// Science: Laplace Transform
-// Domain: math_sci
+// Laplace transform — numerical evaluation and an inverse via the
+// Stehfest algorithm.
+//
+//   F(s) = ∫₀^∞  f(t) · e^(−s·t) dt
+//
+// Linear integral transform converting ODE/PDE initial-value problems
+// into algebraic equations in s; indispensable in control theory,
+// circuit analysis, mechanical vibration.
+//
+// Useful pairs (standard tables):
+//   f(t) = 1          ↔  1/s
+//   f(t) = t^n        ↔  n!/s^(n+1)
+//   f(t) = e^(at)     ↔  1/(s−a)
+//   f(t) = sin(ωt)    ↔  ω/(s²+ω²)
+//   f(t) = cos(ωt)    ↔  s/(s²+ω²)
+//   f(t) = δ(t)       ↔  1
+//
+// Stehfest (1970) inverse — Gaver-Stehfest numerical inversion,
+// excellent for smooth monotone f; uses N typically 6..18 (even).
+// Reference: Stehfest, CACM 13(1):47-49, 1970.
+
 module science.math_sci.laplace_transform
 
-pub fn compute(params: map) -> map {
-    // Laplace Transform computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub type Func = fn(float) -> float
+
+/// Forward transform evaluated at s via composite Simpson on [0, T_max].
+pub fn laplace(f: Func, s: float, t_max: float, panels: int) -> float {
+    let integrand: Func = |t| f(t) * exp(-s * t)
+    return simpson(integrand, 0.0, t_max, panels)
 }
 
-pub fn describe() -> str {
-    return "Laplace Transform — simulation and computation"
+/// Gaver-Stehfest inverse Laplace transform.  N must be even.
+/// F is the transform F(s). Evaluates f(t).
+pub fn inverse_laplace_stehfest(F: fn(float) -> float, t: float, n: int) -> float {
+    if t <= 0.0 { throw Error("t must be > 0") }
+    if n % 2 != 0 { throw Error("N must be even") }
+    let ln2 = 0.6931471805599453
+    let mut sum = 0.0
+    let mut k = 1
+    while k <= n {
+        let v = stehfest_v(k, n)
+        sum += v * F((k as float) * ln2 / t)
+        k += 1
+    }
+    return ln2 / t * sum
+}
+
+fn stehfest_v(k: int, n: int) -> float {
+    let mut sum = 0.0
+    let half_n = n / 2
+    let lower = (k + 1) / 2
+    let upper = if k < half_n { k } else { half_n }
+    let mut j = lower
+    while j <= upper {
+        let numer = pow_i(j, half_n) * factorial(2 * j)
+        let denom = factorial(half_n - j) * factorial(j) * factorial(j - 1)
+                  * factorial(k - j) * factorial(2 * j - k)
+        sum += numer / denom
+        j += 1
+    }
+    let sign = if (k + half_n) % 2 == 0 { 1.0 } else { -1.0 }
+    return sign * sum
+}
+
+fn pow_i(base: int, exp: int) -> float { let mut p = 1.0; let mut i = 0; while i < exp { p = p * (base as float); i += 1 }; return p }
+fn factorial(n: int) -> float { let mut p = 1.0; let mut i = 2; while i <= n { p = p * (i as float); i += 1 }; return p }
+fn simpson(f: Func, a: float, b: float, n_panels: int) -> float {
+    let n = if n_panels % 2 == 0 { n_panels } else { n_panels + 1 }
+    let h = (b - a) / (n as float)
+    let mut s = f(a) + f(b)
+    let mut i = 1
+    while i < n {
+        s += (if i % 2 == 1 { 4.0 } else { 2.0 }) * f(a + (i as float) * h)
+        i += 1
+    }
+    return s * h / 3.0
+}
+fn exp(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }
+    let r = x - (n as float) * ln2
+    let mut t = 1.0; let mut s = 1.0; let mut k = 1
+    while k < 30 { t = t * r / (k as float); s += t; k += 1 }
+    let mag = if n < 0 { -n } else { n }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if n < 0 { p = 1.0 / p }
+    return s * p
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Laplace Transform: " + result as str)
+    // L{1} = 1/s at s = 2 → 0.5
+    let one: Func = |t| 1.0
+    println("L{1}(2) ≈ " + laplace(one, 2.0, 30.0, 2000) as str)
+    // Invert F(s)=1/(s+1) at t=1 → e^(-1) ≈ 0.3679
+    let F: fn(float) -> float = |s| 1.0 / (s + 1.0)
+    println("L⁻¹{1/(s+1)}(1) ≈ " + inverse_laplace_stehfest(F, 1.0, 14) as str)
 }
