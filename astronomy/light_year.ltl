@@ -1,22 +1,43 @@
-// Science: Light Year Conversions
-// Domain: astronomy
+// Light-year and other astronomical distance units.
+//
+//   1 light-year  = c · (1 Julian year)
+//                 = 299 792 458 m/s · 365.25 · 86400 s
+//                 ≈ 9.4607 × 10¹⁵ m
+//                 ≈ 63 241 AU
+//                 ≈ 0.3066 parsecs
+//
+// Parsecs are defined by parallax: 1 pc is the distance at which 1 AU
+// subtends an angle of one arcsecond. Preferred in professional
+// astronomy; light-years persist in popular writing.
+
 module science.astronomy.light_year
 
-pub fn compute(params: map) -> map {
-    // Light Year Conversions computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
-}
+pub const C: float = 299_792_458.0                // m/s exactly (SI 2019)
+pub const SECONDS_PER_JULIAN_YEAR: float = 365.25 * 86400.0
+pub const AU_IN_METERS: float = 1.495978707e11    // IAU 2012
+pub const PARSEC_IN_METERS: float = 3.085677581491367e16
 
-pub fn describe() -> str {
-    return "Light Year Conversions — simulation and computation"
+pub fn light_year_m() -> float { return C * SECONDS_PER_JULIAN_YEAR }
+
+pub fn meters_to_ly(m: float) -> float      { return m / light_year_m() }
+pub fn ly_to_meters(ly: float) -> float     { return ly * light_year_m() }
+
+pub fn meters_to_au(m: float) -> float      { return m / AU_IN_METERS }
+pub fn au_to_meters(au: float) -> float     { return au * AU_IN_METERS }
+
+pub fn meters_to_parsec(m: float) -> float  { return m / PARSEC_IN_METERS }
+pub fn parsec_to_meters(pc: float) -> float { return pc * PARSEC_IN_METERS }
+
+pub fn ly_to_parsec(ly: float) -> float     { return ly_to_meters(ly) / PARSEC_IN_METERS }
+pub fn parsec_to_ly(pc: float) -> float     { return meters_to_ly(parsec_to_meters(pc)) }
+
+/// Distance for a given parallax angle (arcseconds) in parsecs.
+pub fn parallax_arcsec_to_parsec(arcsec: float) -> float {
+    if arcsec <= 0.0 { throw Error("parallax must be positive") }
+    return 1.0 / arcsec
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Light Year Conversions: " + result as str)
+    println("1 ly in m: " + light_year_m() as str)
+    println("Proxima Centauri (4.2465 ly) in pc: " + ly_to_parsec(4.2465) as str)   // ~1.302
 }
