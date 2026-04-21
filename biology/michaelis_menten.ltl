@@ -1,22 +1,58 @@
-// Science: Michaelis-Menten Kinetics
-// Domain: biology
+// Michaelis-Menten enzyme kinetics (Michaelis & Menten, 1913).
+//
+//     v = V_max · [S] / (K_m + [S])
+//
+// Derived from the quasi-steady-state approximation for
+//     E + S  ⇌  ES  →  E + P    (Briggs & Haldane, 1925)
+//
+// Two canonical parameters:
+//   • V_max : maximum rate at [S] → ∞   (= k_cat · [E]_total)
+//   • K_m   : substrate concentration giving v = V_max/2
+//            — operationally the affinity (smaller K_m ⇒ tighter binding)
+//
+// Lineweaver-Burk transformation linearizes it (1/v vs 1/[S]); modern
+// fits use non-linear least squares. Enzyme efficiency = k_cat / K_m;
+// for "perfect" enzymes this approaches the diffusion limit ~10⁸-10⁹ M⁻¹s⁻¹
+// (catalase, carbonic anhydrase).
+
 module science.biology.michaelis_menten
 
-pub fn compute(params: map) -> map {
-    // Michaelis-Menten Kinetics computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub fn rate(vmax: float, km: float, substrate: float) -> float {
+    if substrate < 0.0 { throw Error("substrate must be ≥ 0") }
+    return vmax * substrate / (km + substrate)
 }
 
-pub fn describe() -> str {
-    return "Michaelis-Menten Kinetics — simulation and computation"
+/// Fraction of sites occupied, equivalent to v / V_max.
+pub fn saturation(km: float, substrate: float) -> float {
+    return substrate / (km + substrate)
 }
+
+/// Substrate concentration giving a chosen fractional rate (0 < f < 1):
+///     [S] = K_m · f / (1 − f)
+pub fn substrate_for_fraction(km: float, fraction: float) -> float {
+    if fraction <= 0.0 || fraction >= 1.0 { throw Error("fraction in (0,1)") }
+    return km * fraction / (1.0 - fraction)
+}
+
+/// Competitive inhibition: apparent K_m' = K_m (1 + [I]/K_i), V_max unchanged.
+pub fn rate_competitive_inhibition(vmax: float, km: float, substrate: float,
+                                    i_conc: float, ki: float) -> float {
+    let km_app = km * (1.0 + i_conc / ki)
+    return vmax * substrate / (km_app + substrate)
+}
+
+/// Non-competitive inhibition: V_max' = V_max / (1 + [I]/K_i), K_m unchanged.
+pub fn rate_noncompetitive_inhibition(vmax: float, km: float, substrate: float,
+                                       i_conc: float, ki: float) -> float {
+    let vmax_app = vmax / (1.0 + i_conc / ki)
+    return vmax_app * substrate / (km + substrate)
+}
+
+/// Catalytic efficiency k_cat / K_m.
+pub fn efficiency(kcat: float, km: float) -> float { return kcat / km }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Michaelis-Menten Kinetics: " + result as str)
+    // hexokinase on glucose: K_m ~ 0.1 mM, V_max (scaled) 100
+    let v = rate(100.0, 0.1, 0.5)        // [S] = 5·K_m → 83.3% saturation
+    println("v at [S]=0.5 mM: " + v as str)
 }
