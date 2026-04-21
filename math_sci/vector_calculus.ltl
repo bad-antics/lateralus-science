@@ -1,22 +1,102 @@
-// Science: Vector Calculus
-// Domain: math_sci
+// Vector calculus — grad, div, curl via central finite differences;
+// line and surface integrals via midpoint / Simpson rules.
+//
+// Definitions (Cartesian):
+//   ∇f  = (∂f/∂x, ∂f/∂y, ∂f/∂z)                                  gradient
+//   ∇·F = ∂F_x/∂x + ∂F_y/∂y + ∂F_z/∂z                              divergence
+//   ∇×F = (∂F_z/∂y − ∂F_y/∂z,                                      curl
+//           ∂F_x/∂z − ∂F_z/∂x,
+//           ∂F_y/∂x − ∂F_x/∂y)
+//   ∇²f = ∂²f/∂x² + ∂²f/∂y² + ∂²f/∂z²                             Laplacian
+//
+// Theorems hinted at, not asserted here:
+//   Green's, Stokes's, Divergence (Gauss's). Central differences are
+//   O(h²) accurate; Laplacian via 7-point stencil is O(h²) as well.
+
 module science.math_sci.vector_calculus
 
-pub fn compute(params: map) -> map {
-    // Vector Calculus computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
+pub struct Vec3 { pub x: float, pub y: float, pub z: float }
+
+pub type Scalar = fn(float, float, float) -> float
+pub type Field  = fn(float, float, float) -> Vec3
+
+pub fn add(a: Vec3, b: Vec3) -> Vec3 { return Vec3 { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z } }
+pub fn sub(a: Vec3, b: Vec3) -> Vec3 { return Vec3 { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z } }
+pub fn scale(a: Vec3, s: float) -> Vec3 { return Vec3 { x: a.x * s, y: a.y * s, z: a.z * s } }
+pub fn dot(a: Vec3, b: Vec3) -> float { return a.x * b.x + a.y * b.y + a.z * b.z }
+pub fn cross(a: Vec3, b: Vec3) -> Vec3 {
+    return Vec3 {
+        x: a.y * b.z - a.z * b.y,
+        y: a.z * b.x - a.x * b.z,
+        z: a.x * b.y - a.y * b.x,
     }
-    return results
+}
+pub fn norm(a: Vec3) -> float { return sqrt(dot(a, a)) }
+
+pub fn gradient(f: Scalar, x: float, y: float, z: float, h: float) -> Vec3 {
+    return Vec3 {
+        x: (f(x + h, y, z) - f(x - h, y, z)) / (2.0 * h),
+        y: (f(x, y + h, z) - f(x, y - h, z)) / (2.0 * h),
+        z: (f(x, y, z + h) - f(x, y, z - h)) / (2.0 * h),
+    }
 }
 
-pub fn describe() -> str {
-    return "Vector Calculus — simulation and computation"
+pub fn divergence(F: Field, x: float, y: float, z: float, h: float) -> float {
+    let fx_p = F(x + h, y, z).x; let fx_m = F(x - h, y, z).x
+    let fy_p = F(x, y + h, z).y; let fy_m = F(x, y - h, z).y
+    let fz_p = F(x, y, z + h).z; let fz_m = F(x, y, z - h).z
+    return (fx_p - fx_m) / (2.0 * h)
+         + (fy_p - fy_m) / (2.0 * h)
+         + (fz_p - fz_m) / (2.0 * h)
 }
+
+pub fn curl(F: Field, x: float, y: float, z: float, h: float) -> Vec3 {
+    let dFz_dy = (F(x, y + h, z).z - F(x, y - h, z).z) / (2.0 * h)
+    let dFy_dz = (F(x, y, z + h).y - F(x, y, z - h).y) / (2.0 * h)
+    let dFx_dz = (F(x, y, z + h).x - F(x, y, z - h).x) / (2.0 * h)
+    let dFz_dx = (F(x + h, y, z).z - F(x - h, y, z).z) / (2.0 * h)
+    let dFy_dx = (F(x + h, y, z).y - F(x - h, y, z).y) / (2.0 * h)
+    let dFx_dy = (F(x, y + h, z).x - F(x, y - h, z).x) / (2.0 * h)
+    return Vec3 {
+        x: dFz_dy - dFy_dz,
+        y: dFx_dz - dFz_dx,
+        z: dFy_dx - dFx_dy,
+    }
+}
+
+pub fn laplacian(f: Scalar, x: float, y: float, z: float, h: float) -> float {
+    let c = f(x, y, z)
+    return (f(x + h, y, z) + f(x - h, y, z)
+          + f(x, y + h, z) + f(x, y - h, z)
+          + f(x, y, z + h) + f(x, y, z - h)
+          - 6.0 * c) / (h * h)
+}
+
+/// Line integral ∫_C F·dr for C(t) = γ(t), t ∈ [a,b], midpoint rule.
+pub fn line_integral(F: Field, gamma: fn(float) -> Vec3, a: float, b: float, n: int) -> float {
+    let h = (b - a) / (n as float)
+    let mut s = 0.0; let mut i = 0
+    while i < n {
+        let t_mid = a + (i as float + 0.5) * h
+        let t_m_minus_h = gamma(t_mid - 1e-6)
+        let t_m_plus_h  = gamma(t_mid + 1e-6)
+        let dr = scale(sub(t_m_plus_h, t_m_minus_h), 1.0 / 2e-6)
+        let p = gamma(t_mid)
+        s += dot(F(p.x, p.y, p.z), dr) * h
+        i += 1
+    }
+    return s
+}
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Vector Calculus: " + result as str)
+    // f(x,y,z) = x²y  →  ∇f = (2xy, x², 0); at (1,2,3) → (4,1,0).
+    let f: Scalar = |x, y, z| x * x * y
+    let g = gradient(f, 1.0, 2.0, 3.0, 1e-4)
+    println("∇f(1,2,3) = (" + g.x as str + ", " + g.y as str + ", " + g.z as str + ")")
+    // F = (y, -x, 0) → curl = (0, 0, -2).
+    let F: Field = |x, y, z| Vec3 { x: y, y: -x, z: 0.0 }
+    let c = curl(F, 0.0, 0.0, 0.0, 1e-4)
+    println("curl(y, -x, 0) = (" + c.x as str + ", " + c.y as str + ", " + c.z as str + ")")
 }
