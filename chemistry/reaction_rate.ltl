@@ -1,22 +1,84 @@
-// Science: Reaction Rate
-// Domain: chemistry
+// Reaction kinetics — rate laws and Arrhenius temperature dependence.
+//
+// Rate law:       r = k · [A]^a · [B]^b ...
+// Order = a + b + ...  (not in general the stoichiometric coefficients!)
+//
+// Integrated rate laws:
+//   Zero order: [A] = [A]₀ − k·t          half-life  t½ = [A]₀ / (2k)
+//   First:      ln[A] = ln[A]₀ − k·t      t½ = ln2 / k        (CONSTANT)
+//   Second:     1/[A] = 1/[A]₀ + k·t      t½ = 1/(k·[A]₀)
+//
+// Arrhenius:   k = A · exp(−E_a / (R·T))
+// Useful corollary: ln(k₂/k₁) = −E_a/R · (1/T₂ − 1/T₁).
+
 module science.chemistry.reaction_rate
 
-pub fn compute(params: map) -> map {
-    // Reaction Rate computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const R: float = 8.314462618
+
+/// Arrhenius rate constant.
+pub fn arrhenius(a: float, ea_j_per_mol: float, t_k: float) -> float {
+    return a * exp(-ea_j_per_mol / (R * t_k))
 }
 
-pub fn describe() -> str {
-    return "Reaction Rate — simulation and computation"
+/// E_a from two rate constants at two temperatures.
+pub fn activation_energy(k1: float, t1: float, k2: float, t2: float) -> float {
+    return -R * ln(k2 / k1) / (1.0 / t2 - 1.0 / t1)
 }
+
+// ----- integrated rate laws -----
+pub fn zero_order_conc(a0: float, k: float, t: float) -> float {
+    let c = a0 - k * t
+    return if c < 0.0 { 0.0 } else { c }
+}
+pub fn first_order_conc(a0: float, k: float, t: float) -> float {
+    return a0 * exp(-k * t)
+}
+pub fn second_order_conc(a0: float, k: float, t: float) -> float {
+    return 1.0 / (1.0 / a0 + k * t)
+}
+
+// ----- half-lives -----
+pub fn half_life_zero(a0: float, k: float)  -> float { return a0 / (2.0 * k) }
+pub fn half_life_first(k: float)            -> float { return 0.6931471805599453 / k }
+pub fn half_life_second(a0: float, k: float)-> float { return 1.0 / (k * a0) }
+
+/// Generic rate law r = k · Π[concentrations]^order.
+pub fn rate_law(k: float, terms: [(float, float)]) -> float {
+    let mut r = k
+    for (c, n) in terms { r *= pow(c, n) }
+    return r
+}
+
+// ---- math ----
+fn ln(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let mut m = x; let mut kk = 0.0
+    while m >= 2.0 { m = m / 2.0; kk += 1.0 }
+    while m < 1.0  { m = m * 2.0; kk -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }
+    return kk * ln2 + 2.0 * sum
+}
+fn exp(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }
+    let r = x - (n as float) * ln2
+    let mut t = 1.0; let mut s = 1.0; let mut kk = 1
+    while kk < 25 { t = t * r / (kk as float); s += t; kk += 1 }
+    let mag = if n < 0 { -n } else { n }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if n < 0 { p = 1.0 / p }
+    return s * p
+}
+fn pow(x: float, y: float) -> float { return exp(y * ln(x)) }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Reaction Rate: " + result as str)
+    // Rate doubling per 10 K rule of thumb for E_a ~ 50 kJ/mol around 300 K:
+    let ea = activation_energy(1.0, 300.0, 2.0, 310.0)
+    println("E_a ≈ " + (ea / 1000.0) as str + " kJ/mol")  // ~53
+    // Radioactive C-14 half-life 5730 yr -> first-order k:
+    let k_c14 = 0.6931471805599453 / 5730.0
+    println("C-14 k = " + k_c14 as str + " yr⁻¹")
 }
