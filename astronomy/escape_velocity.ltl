@@ -1,22 +1,56 @@
-// Science: Escape Velocity
-// Domain: astronomy
+// Escape velocity — minimum speed to break free from a gravitating body.
+//
+//   v_esc = √(2·G·M / r)
+//
+// Derivation: set kinetic energy ½mv² equal to the magnitude of
+// gravitational potential energy −GMm/r. The mass m cancels, so
+// escape velocity depends ONLY on the mass of the attractor and
+// the launch radius — independent of the payload.
+//
+// Canonical values (at surface):
+//   • Earth:   11.186 km/s
+//   • Moon:     2.380 km/s
+//   • Mars:     5.027 km/s
+//   • Sun:    617.5   km/s
+//   • Jupiter: 59.5   km/s
+//   • Black-hole event horizon: exactly c (by definition of Rₛ).
+//
+// Note: this is the LOCAL escape velocity, assuming no atmosphere
+// or other gravity wells. Real rockets add ~1.5-2 km/s of ΔV to
+// fight drag and gravity losses — see Tsiolkovsky rocket equation.
+
 module science.astronomy.escape_velocity
 
-pub fn compute(params: map) -> map {
-    // Escape Velocity computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const G: float = 6.674e-11       // N·m²/kg²  (CODATA 2018)
+
+pub fn escape_velocity(mass_kg: float, radius_m: float) -> float {
+    if mass_kg <= 0 || radius_m <= 0 { throw Error("escape_velocity: positive values required") }
+    return sqrt(2.0 * G * mass_kg / radius_m)
 }
 
-pub fn describe() -> str {
-    return "Escape Velocity — simulation and computation"
+/// Schwarzschild radius — horizon where v_esc = c.  r_s = 2GM/c².
+pub fn schwarzschild_radius(mass_kg: float) -> float {
+    let c = 299_792_458.0
+    return 2.0 * G * mass_kg / (c * c)
+}
+
+/// Energy per unit mass needed to escape.  ε = -U = GM/r.
+pub fn specific_escape_energy(mass_kg: float, radius_m: float) -> float {
+    return G * mass_kg / radius_m
+}
+
+fn sqrt(x: float) -> float {
+    if x < 0.0 { throw Error("sqrt: negative") }
+    if x == 0.0 { return 0.0 }
+    let mut g = x
+    let mut i = 0
+    while i < 40 { g = 0.5 * (g + x / g); i += 1 }
+    return g
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Escape Velocity: " + result as str)
+    let m_earth = 5.972e24
+    let r_earth = 6.371e6
+    println("Earth v_esc = " + escape_velocity(m_earth, r_earth) as str + " m/s")   // 11186
+    println("Earth r_s   = " + schwarzschild_radius(m_earth) as str + " m")         // 8.87 mm
 }
