@@ -1,22 +1,67 @@
-// Science: Hardy-Weinberg Equilibrium
-// Domain: biology
+// Hardy-Weinberg Equilibrium (1908, independently).
+//
+// For a sexually reproducing diploid population meeting:
+//   • Random mating          • No selection
+//   • No mutation            • No migration
+//   • Infinite population size
+// allele frequencies stay constant across generations, and genotype
+// frequencies after one generation are:
+//
+//     p² + 2pq + q² = 1           (p + q = 1)
+//
+// Real populations deviate (drift, selection); the chi-square test
+// of HWE is the standard screen for population stratification in
+// genome-wide association studies (GWAS) and Mendelian disease
+// carrier-frequency estimation (CFTR, HbS, etc.).
+
 module science.biology.hardy_weinberg
 
-pub fn compute(params: map) -> map {
-    // Hardy-Weinberg Equilibrium computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub struct Genotypes { pub aa: float, pub ab: float, pub bb: float }
+
+/// Expected genotype frequencies from allele frequency p (q = 1-p).
+pub fn genotype_frequencies(p: float) -> Genotypes {
+    if p < 0.0 || p > 1.0 { throw Error("p must be in [0,1]") }
+    let q = 1.0 - p
+    return Genotypes { aa: p * p, ab: 2.0 * p * q, bb: q * q }
 }
 
-pub fn describe() -> str {
-    return "Hardy-Weinberg Equilibrium — simulation and computation"
+/// Allele frequency p from observed genotype counts.
+///   p = (2·n_AA + n_AB) / (2·N)
+pub fn allele_freq_p(n_aa: int, n_ab: int, n_bb: int) -> float {
+    let n = n_aa + n_ab + n_bb
+    if n == 0 { throw Error("empty sample") }
+    return (2.0 * (n_aa as float) + (n_ab as float)) / (2.0 * (n as float))
 }
+
+/// Chi-square statistic for HWE (1 degree of freedom).
+///   χ² = Σ (O − E)² / E
+/// Compare against 3.841 for α = 0.05.
+pub fn hwe_chi_square(n_aa: int, n_ab: int, n_bb: int) -> float {
+    let total = (n_aa + n_ab + n_bb) as float
+    let p = allele_freq_p(n_aa, n_ab, n_bb)
+    let exp = genotype_frequencies(p)
+    let e_aa = total * exp.aa
+    let e_ab = total * exp.ab
+    let e_bb = total * exp.bb
+    return sq(n_aa as float - e_aa) / e_aa
+         + sq(n_ab as float - e_ab) / e_ab
+         + sq(n_bb as float - e_bb) / e_bb
+}
+
+/// Carrier frequency for a recessive disease given incidence q².
+///   2pq with q = √q²
+pub fn carrier_frequency(disease_incidence: float) -> float {
+    let q = sqrt(disease_incidence)
+    return 2.0 * (1.0 - q) * q
+}
+
+fn sq(x: float) -> float { return x * x }
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Hardy-Weinberg Equilibrium: " + result as str)
+    // Cystic fibrosis in Caucasians ~1/2500:
+    let cf = carrier_frequency(1.0 / 2500.0)
+    println("CF carrier freq: 1 in " + (1.0 / cf) as str)   // ~1 in 25
+    let chi = hwe_chi_square(298, 489, 213)
+    println("χ² (HWE): " + chi as str + " (< 3.841 → consistent)")
 }
