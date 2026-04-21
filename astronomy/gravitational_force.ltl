@@ -1,22 +1,56 @@
-// Science: Gravitational Force
-// Domain: astronomy
+// Newton's law of universal gravitation (Principia, 1687).
+//
+//   F = G · m₁ · m₂ / r²
+//
+// The inverse-square form is a direct consequence of the surface area
+// of a sphere scaling as 4πr²: any "flux" emitted isotropically thins
+// with r². Confirmed to ~10⁻¹² precision at lab scales (torsion balance
+// experiments since Cavendish 1798).
+//
+// For strong fields or v → c use general relativity. For extended
+// bodies integrate the shell theorem: a spherically symmetric mass
+// acts, from outside, as if concentrated at its center.
+
 module science.astronomy.gravitational_force
 
-pub fn compute(params: map) -> map {
-    // Gravitational Force computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const G: float = 6.674e-11
+
+pub fn gravity_force(m1_kg: float, m2_kg: float, r_m: float) -> float {
+    if r_m <= 0.0 { throw Error("gravity_force: r must be > 0") }
+    return G * m1_kg * m2_kg / (r_m * r_m)
 }
 
-pub fn describe() -> str {
-    return "Gravitational Force — simulation and computation"
+/// Surface gravity of a spherical body: g = G·M/R².
+pub fn surface_gravity(mass_kg: float, radius_m: float) -> float {
+    return G * mass_kg / (radius_m * radius_m)
+}
+
+/// Gravitational potential energy U(r) = -G·m₁·m₂/r, with U(∞) = 0.
+pub fn potential_energy(m1_kg: float, m2_kg: float, r_m: float) -> float {
+    return -G * m1_kg * m2_kg / r_m
+}
+
+/// Roche limit (rigid-body formula):
+///     d = R_M · (2 · ρ_M / ρ_m)^(1/3)
+/// Below this distance a satellite held together only by self-gravity
+/// is torn apart by tidal forces. Explains Saturn's rings.
+pub fn roche_limit_rigid(r_primary_m: float, density_primary: float,
+                          density_satellite: float) -> float {
+    let ratio = 2.0 * density_primary / density_satellite
+    return r_primary_m * cbrt(ratio)
+}
+
+fn cbrt(x: float) -> float {
+    if x == 0.0 { return 0.0 }
+    let sign = if x < 0.0 { -1.0 } else { 1.0 }
+    let ax = if x < 0.0 { -x } else { x }
+    let mut g = ax
+    let mut i = 0
+    while i < 40 { g = (2.0 * g + ax / (g * g)) / 3.0; i += 1 }
+    return sign * g
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Gravitational Force: " + result as str)
+    let g_earth = surface_gravity(5.972e24, 6.371e6)
+    println("g_earth = " + g_earth as str + " m/s²")   // ~9.82
 }
