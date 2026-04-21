@@ -1,22 +1,70 @@
-// Science: Population Growth Models
-// Domain: biology
+// Population growth models — exponential, logistic, Gompertz.
+//
+// Exponential:  N(t) = N₀·e^(r·t)              unlimited resources
+// Logistic:     N(t) = K / (1 + A·e^(-r·t))     Verhulst 1838
+//               A    = (K − N₀) / N₀
+// Gompertz:     N(t) = K · exp(-ln(K/N₀)·e^(-r·t))    tumour/cohort data
+// Allee effect: dN/dt = r·N·(N/A − 1)·(1 − N/K)       weak-Allee: extinction below A.
+//
+// Logistic has an inflection at N = K/2 (max absolute growth). Gompertz
+// is asymmetric with earlier inflection at N = K/e ≈ 0.37K — fits
+// tumour growth and animal weight curves better.
+
 module science.biology.population_growth
 
-pub fn compute(params: map) -> map {
-    // Population Growth Models computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub fn exponential(n0: float, r: float, t: float) -> float {
+    return n0 * exp(r * t)
 }
 
-pub fn describe() -> str {
-    return "Population Growth Models — simulation and computation"
+pub fn logistic(n0: float, k: float, r: float, t: float) -> float {
+    if n0 <= 0.0 { throw Error("n0 must be > 0") }
+    let a = (k - n0) / n0
+    return k / (1.0 + a * exp(-r * t))
+}
+
+pub fn gompertz(n0: float, k: float, r: float, t: float) -> float {
+    if n0 <= 0.0 || k <= 0.0 { throw Error("n0 and K must be > 0") }
+    return k * exp(-ln(k / n0) * exp(-r * t))
+}
+
+/// Instantaneous growth rate dN/dt for logistic.
+pub fn logistic_growth_rate(n: float, k: float, r: float) -> float {
+    return r * n * (1.0 - n / k)
+}
+
+/// Doubling time under pure exponential growth.
+pub fn doubling_time(r: float) -> float {
+    if r <= 0.0 { throw Error("r must be > 0 for doubling") }
+    return 0.6931471805599453 / r
+}
+
+// ---- math core ----
+const LN2: float = 0.6931471805599453
+
+fn exp(x: float) -> float {
+    let n = if x >= 0.0 { (x / LN2 + 0.5) as int } else { (x / LN2 - 0.5) as int }
+    let r = x - (n as float) * LN2
+    let mut t = 1.0; let mut s = 1.0; let mut k = 1
+    while k < 25 { t = t * r / (k as float); s += t; k += 1 }
+    let mag = if n < 0 { -n } else { n }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if n < 0 { p = 1.0 / p }
+    return s * p
+}
+fn ln(x: float) -> float {
+    if x <= 0.0 { throw Error("ln: non-positive") }
+    let mut m = x; let mut k = 0.0
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }
+    return k * LN2 + 2.0 * sum
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Population Growth Models: " + result as str)
+    // Bacterial culture: N₀=100, r=0.5/h, K=1e6
+    println("Logistic @ t=20h: " + logistic(100.0, 1_000_000.0, 0.5, 20.0) as str)
+    println("Doubling time @ r=0.5/h: " + doubling_time(0.5) as str + " h")   // 1.386
 }
