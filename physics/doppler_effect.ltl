@@ -1,22 +1,65 @@
-// Science: Doppler Effect
-// Domain: physics
+// Doppler effect.
+//
+// Classical (sound, general medium):
+//     f' = f · (c + v_obs) / (c + v_src)
+//
+// Sign convention: v_obs and v_src are MAGNITUDES along the line
+// from source to observer, signed such that approaching is positive
+// in the numerator and negative in the denominator. Shorthand for
+// "source approaches stationary observer":
+//     f' = f · c / (c − v_src)
+//
+// Relativistic (light, longitudinal):
+//     f' = f · √((1−β)/(1+β))   β = v/c,  approaching is β>0 → f' > f
+//
+// Applications: radar guns, medical Doppler ultrasound, redshift of
+// distant galaxies, SONAR, Global Positioning System correction.
+
 module science.physics.doppler_effect
 
-pub fn compute(params: map) -> map {
-    // Doppler Effect computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const C_SOUND_AIR: float = 343.0          // m/s at 20 °C
+pub const C_LIGHT:     float = 299_792_458.0  // m/s
+
+/// General classical Doppler. `v_observer` positive if moving toward source,
+/// `v_source` positive if moving toward observer.
+pub fn classical(f_src: float, c: float, v_observer: float, v_source: float) -> float {
+    let num = c + v_observer
+    let den = c - v_source
+    return f_src * num / den
 }
 
-pub fn describe() -> str {
-    return "Doppler Effect — simulation and computation"
+/// Source moving, observer stationary.
+pub fn source_approach(f_src: float, c: float, v_src: float) -> float {
+    return f_src * c / (c - v_src)
 }
+
+/// Observer moving toward stationary source.
+pub fn observer_approach(f_src: float, c: float, v_obs: float) -> float {
+    return f_src * (c + v_obs) / c
+}
+
+/// Relativistic longitudinal Doppler (light); β > 0 ⇒ approaching.
+pub fn relativistic_longitudinal(f_src: float, beta: float) -> float {
+    if beta <= -1.0 || beta >= 1.0 { throw Error("|β| must be < 1") }
+    return f_src * sqrt((1.0 + beta) / (1.0 - beta))
+}
+
+/// Transverse relativistic Doppler (pure time dilation, no approach):
+///     f' = f · √(1 − β²)
+pub fn relativistic_transverse(f_src: float, beta: float) -> float {
+    return f_src * sqrt(1.0 - beta * beta)
+}
+
+/// Recover source velocity (toward observer) from classical ratio f'/f.
+pub fn velocity_from_ratio_classical(ratio: float, c: float) -> float {
+    return c * (1.0 - 1.0 / ratio)
+}
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Doppler Effect: " + result as str)
+    // Ambulance siren 700 Hz, approaching at 30 m/s:
+    println("f' (sound): " + source_approach(700.0, C_SOUND_AIR, 30.0) as str + " Hz")
+    // Relativistic v = 0.1c:
+    println("f'/f (β=0.1): " + relativistic_longitudinal(1.0, 0.1) as str)   // ~1.106
 }
