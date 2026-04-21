@@ -1,22 +1,56 @@
-// Science: Buoyancy & Archimedes
-// Domain: physics
+// Buoyancy — Archimedes' principle (c. 250 BCE).
+//
+//   F_b = ρ_fluid · V_displaced · g
+//
+// An object submerged in a fluid experiences an upward force equal to
+// the weight of the fluid it displaces. A floating object displaces
+// a volume of fluid whose weight equals its own weight.
+//
+//   V_submerged / V_total = ρ_object / ρ_fluid       (floating)
+//
+// Applications: ship design (freeboard, plimsoll line), submarine
+// ballast, hot-air balloon lift, density measurement (hydrometer).
+
 module science.physics.buoyancy
 
-pub fn compute(params: map) -> map {
-    // Buoyancy & Archimedes computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const G_EARTH: float = 9.80665        // m/s² standard gravity
+
+/// Buoyant force (N) for a fully-submerged object.
+pub fn buoyant_force(fluid_density: float, volume_m3: float, g: float) -> float {
+    return fluid_density * volume_m3 * g
 }
 
-pub fn describe() -> str {
-    return "Buoyancy & Archimedes — simulation and computation"
+/// Fraction of an object submerged when floating.
+pub fn submerged_fraction(object_density: float, fluid_density: float) -> float {
+    if object_density >= fluid_density { return 1.0 }     // sinks
+    return object_density / fluid_density
+}
+
+/// Apparent weight of a fully submerged object (N).
+///   W_apparent = W − F_b = (ρ_obj − ρ_fluid) · V · g
+pub fn apparent_weight(object_mass_kg: float, object_density: float,
+                        fluid_density: float, g: float) -> float {
+    let volume = object_mass_kg / object_density
+    return object_mass_kg * g - fluid_density * volume * g
+}
+
+/// Density of an object from measured dry and submerged weights.
+///   ρ_obj = ρ_fluid · W_dry / (W_dry − W_submerged)
+pub fn density_from_weights(dry_weight: float, submerged_weight: float,
+                             fluid_density: float) -> float {
+    return fluid_density * dry_weight / (dry_weight - submerged_weight)
+}
+
+/// Maximum payload a hot-air balloon can lift.
+///   m_lift = V · (ρ_cold − ρ_hot)
+pub fn balloon_lift(volume_m3: float, rho_outside: float, rho_inside: float) -> float {
+    return volume_m3 * (rho_outside - rho_inside)
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Buoyancy & Archimedes: " + result as str)
+    // Iceberg in sea water: ρ_ice ~ 917, ρ_seawater ~ 1025:
+    let frac = submerged_fraction(917.0, 1025.0)
+    println("Iceberg submerged fraction: " + frac as str)    // ~0.895 → "90% below water"
+    // 1 m³ oak (ρ=750) in water:
+    println("Oak lift: " + apparent_weight(750.0, 750.0, 1000.0, G_EARTH) as str + " N")
 }
