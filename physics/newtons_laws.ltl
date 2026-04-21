@@ -1,22 +1,72 @@
-// Science: Newton's Laws
-// Domain: physics
+// Newton's laws of motion (Philosophiæ Naturalis Principia Mathematica, 1687).
+//
+//   1st (Inertia):  Absent net force, an object continues in uniform motion.
+//   2nd:            F = dp/dt  = m·a   (constant mass)
+//   3rd:            Every action has an equal and opposite reaction.
+//
+// Range of validity: classical regime (v ≪ c, macroscopic scale,
+// non-quantum). For relativistic mechanics use p = γmv and F = dp/dt
+// with γ = 1/√(1−v²/c²).
+//
+// Provided: kinematics for constant acceleration, 2-D projectile
+// range/height, friction-force and normal-force helpers, weight
+// on inclined plane.
+
 module science.physics.newtons_laws
 
-pub fn compute(params: map) -> map {
-    // Newton's Laws computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const G_EARTH: float = 9.80665
+
+pub fn force(mass: float, acceleration: float) -> float { return mass * acceleration }
+pub fn acceleration(force: float, mass: float) -> float { return force / mass }
+
+/// Weight (N) at surface gravity g.
+pub fn weight(mass: float, g: float) -> float { return mass * g }
+
+// ---- 1-D constant acceleration kinematics ----
+pub fn position(x0: float, v0: float, a: float, t: float) -> float {
+    return x0 + v0 * t + 0.5 * a * t * t
+}
+pub fn velocity(v0: float, a: float, t: float) -> float { return v0 + a * t }
+pub fn v_squared(v0: float, a: float, dx: float) -> float {
+    return v0 * v0 + 2.0 * a * dx
 }
 
-pub fn describe() -> str {
-    return "Newton's Laws — simulation and computation"
+// ---- Friction ----
+pub fn friction_force(coeff: float, normal: float) -> float { return coeff * normal }
+
+/// Normal force on horizontal surface (no vertical acceleration).
+pub fn normal_force_horizontal(mass: float, g: float) -> float { return mass * g }
+
+/// Normal force on an incline angle θ (rad).
+pub fn normal_force_incline(mass: float, g: float, theta: float) -> float {
+    return mass * g * cos(theta)
 }
+
+/// Parallel (down-slope) gravitational component.
+pub fn gravity_down_incline(mass: float, g: float, theta: float) -> float {
+    return mass * g * sin(theta)
+}
+
+// ---- 2-D projectile motion (from ground, no drag) ----
+pub fn projectile_range(v0: float, theta: float, g: float) -> float {
+    return v0 * v0 * sin(2.0 * theta) / g
+}
+pub fn projectile_max_height(v0: float, theta: float, g: float) -> float {
+    let s = sin(theta)
+    return v0 * v0 * s * s / (2.0 * g)
+}
+pub fn projectile_flight_time(v0: float, theta: float, g: float) -> float {
+    return 2.0 * v0 * sin(theta) / g
+}
+
+// ---- kernels ----
+fn sin(x: float) -> float { let y = reduce(x); let mut s = y; let mut t = y; let mut k = 1; while k < 20 { t = -t * y * y / (((2*k) as float) * ((2*k+1) as float)); s += t; k += 1 }; return s }
+fn cos(x: float) -> float { let y = reduce(x); let mut s = 1.0; let mut t = 1.0; let mut k = 1; while k < 20 { t = -t * y * y / (((2*k-1) as float) * ((2*k) as float)); s += t; k += 1 }; return s }
+fn reduce(x: float) -> float { let pi = 3.141592653589793; let mut y = x; while y > pi { y -= 2.0 * pi }; while y < -pi { y += 2.0 * pi }; return y }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Newton's Laws: " + result as str)
+    // Cannonball v0 = 100 m/s at 45°:
+    let pi = 3.141592653589793
+    let r = projectile_range(100.0, pi / 4.0, G_EARTH)
+    println("Range @ 45°, 100 m/s: " + r as str + " m")   // ~1020
 }
