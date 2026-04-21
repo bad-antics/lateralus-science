@@ -1,22 +1,83 @@
-// Science: Fourier Series
-// Domain: math_sci
+// Fourier series — any piecewise-smooth periodic f of period T admits
+//
+//   f(x) = a₀/2 + Σ_{n=1..∞} [ aₙ·cos(n·ω·x) + bₙ·sin(n·ω·x) ]
+//
+//   ω  = 2π/T
+//   aₙ = (2/T) ∫₀ᵀ f(x)·cos(n·ω·x) dx
+//   bₙ = (2/T) ∫₀ᵀ f(x)·sin(n·ω·x) dx
+//
+// Convergence: pointwise at points of continuity; uniform if f is
+// continuous and piecewise C¹. At jump discontinuities the series
+// converges to the midpoint of left/right limits (Dirichlet 1829).
+//
+// This module computes coefficients via numerical integration
+// (Simpson's rule, O(N)) and evaluates the partial sum.
+
 module science.math_sci.fourier_series
 
-pub fn compute(params: map) -> map {
-    // Fourier Series computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
+pub const PI: float = 3.141592653589793
+
+pub struct Coeffs { pub a0: float, pub a: [float], pub b: [float] }
+
+pub type Func = fn(float) -> float
+
+/// Composite Simpson's rule on [0, T] with 2N subintervals.
+fn simpson(f: Func, a: float, b: float, n_panels: int) -> float {
+    let n = if n_panels % 2 == 0 { n_panels } else { n_panels + 1 }
+    let h = (b - a) / (n as float)
+    let mut s = f(a) + f(b)
+    let mut i = 1
+    while i < n {
+        let x = a + (i as float) * h
+        s += (if i % 2 == 1 { 4.0 } else { 2.0 }) * f(x)
+        i += 1
     }
-    return results
+    return s * h / 3.0
 }
 
-pub fn describe() -> str {
-    return "Fourier Series — simulation and computation"
+/// Fourier coefficients for function f of period T, up to harmonic N.
+pub fn fourier_coefficients(f: Func, period: float, n_harmonics: int,
+                             integration_panels: int) -> Coeffs {
+    let omega = 2.0 * PI / period
+    let mut a: [float] = []
+    let mut b: [float] = []
+    let a0 = (2.0 / period) * simpson(f, 0.0, period, integration_panels)
+    let mut n = 1
+    while n <= n_harmonics {
+        let nn = n
+        let cos_integrand: Func = |x| f(x) * cos((nn as float) * omega * x)
+        let sin_integrand: Func = |x| f(x) * sin((nn as float) * omega * x)
+        a.push((2.0 / period) * simpson(cos_integrand, 0.0, period, integration_panels))
+        b.push((2.0 / period) * simpson(sin_integrand, 0.0, period, integration_panels))
+        n += 1
+    }
+    return Coeffs { a0: a0, a: a, b: b }
 }
+
+/// Evaluate partial Fourier sum at x.
+pub fn fourier_sum(c: Coeffs, period: float, x: float) -> float {
+    let omega = 2.0 * PI / period
+    let mut s = c.a0 / 2.0
+    let mut n = 0
+    while n < c.a.len() {
+        let nf = (n + 1) as float
+        s += c.a[n] * cos(nf * omega * x) + c.b[n] * sin(nf * omega * x)
+        n += 1
+    }
+    return s
+}
+
+fn sin(x: float) -> float { let y = reduce_2pi(x); return sin_core(y) }
+fn cos(x: float) -> float { let y = reduce_2pi(x); return cos_core(y) }
+fn sin_core(x: float) -> float { let mut s = x; let mut t = x; let mut k = 1; while k < 20 { t = -t * x * x / (((2*k) as float) * ((2*k+1) as float)); s += t; k += 1 }; return s }
+fn cos_core(x: float) -> float { let mut s = 1.0; let mut t = 1.0; let mut k = 1; while k < 20 { t = -t * x * x / (((2*k-1) as float) * ((2*k) as float)); s += t; k += 1 }; return s }
+fn reduce_2pi(x: float) -> float { let mut y = x; while y > PI { y -= 2.0 * PI }; while y < -PI { y += 2.0 * PI }; return y }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Fourier Series: " + result as str)
+    // Square wave of period 2π: f(x)=1 on (0,π), -1 on (π,2π).
+    // Known series: (4/π) Σ sin((2k-1)x)/(2k-1).
+    let square: Func = |x| if x < PI { 1.0 } else { -1.0 }
+    let c = fourier_coefficients(square, 2.0 * PI, 9, 200)
+    println("b1 ≈ 4/π = " + c.b[0] as str)    // ~1.273
+    println("b3 ≈ 4/(3π) = " + c.b[2] as str) // ~0.424
 }
