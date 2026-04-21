@@ -1,22 +1,75 @@
-// Science: Stoichiometry
-// Domain: chemistry
+// Stoichiometry — yields, limiting reagents, percent composition.
+//
+// For aA + bB → cC + dD:
+//   • Moles from mass: n = m / M   (M = molar mass)
+//   • Stoichiometric ratios:  n_C / n_A = c / a
+//   • Limiting reagent: the one that gives the SMALLEST product
+//     moles after dividing by its stoichiometric coefficient
+//   • Theoretical yield: mass of product from limiting reagent at 100%
+//   • Percent yield:     actual_mass / theoretical_mass · 100
+//
+// Every balanced-equation problem in intro chemistry reduces to these.
+
 module science.chemistry.stoichiometry
 
-pub fn compute(params: map) -> map {
-    // Stoichiometry computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub struct Reagent {
+    pub mass_g: float,
+    pub molar_mass: float,
+    pub coefficient: float,       // stoichiometric coefficient in balanced eq.
 }
 
-pub fn describe() -> str {
-    return "Stoichiometry — simulation and computation"
+pub fn moles(mass_g: float, molar_mass: float) -> float {
+    return mass_g / molar_mass
+}
+
+pub fn mass_from_moles(n: float, molar_mass: float) -> float {
+    return n * molar_mass
+}
+
+/// Index of the limiting reagent in the input array, or -1 if empty.
+/// Smallest ratio of (moles / stoichiometric coefficient) wins.
+pub fn limiting_reagent(reagents: [Reagent]) -> int {
+    if reagents.len() == 0 { return -1 }
+    let mut best_idx = 0
+    let mut best = moles(reagents[0].mass_g, reagents[0].molar_mass)
+                 / reagents[0].coefficient
+    let mut i = 1
+    while i < reagents.len() {
+        let r = reagents[i]
+        let ratio = moles(r.mass_g, r.molar_mass) / r.coefficient
+        if ratio < best { best = ratio; best_idx = i }
+        i += 1
+    }
+    return best_idx
+}
+
+/// Theoretical product mass from the limiting reagent.
+pub fn theoretical_yield_g(reagents: [Reagent], product_coeff: float,
+                            product_molar_mass: float) -> float {
+    let li = limiting_reagent(reagents)
+    if li < 0 { return 0.0 }
+    let lim = reagents[li]
+    let extent = moles(lim.mass_g, lim.molar_mass) / lim.coefficient
+    return extent * product_coeff * product_molar_mass
+}
+
+/// Percent yield = 100 · actual / theoretical.
+pub fn percent_yield(actual_mass_g: float, theoretical_mass_g: float) -> float {
+    return 100.0 * actual_mass_g / theoretical_mass_g
+}
+
+/// Percent composition by mass of a single element in a compound.
+///   %X = (count · M_X / M_compound) · 100
+pub fn percent_composition(element_molar_mass: float, count: float,
+                            compound_molar_mass: float) -> float {
+    return 100.0 * count * element_molar_mass / compound_molar_mass
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Stoichiometry: " + result as str)
+    // 2 H₂ + O₂ → 2 H₂O, given 4 g H₂ and 32 g O₂:
+    let h2 = Reagent { mass_g: 4.0,  molar_mass: 2.016,  coefficient: 2.0 }
+    let o2 = Reagent { mass_g: 32.0, molar_mass: 31.998, coefficient: 1.0 }
+    let y = theoretical_yield_g([h2, o2], 2.0, 18.015)
+    println("Theoretical H₂O: " + y as str + " g")        // ~35.7 g (H₂ limiting)
+    println("%H in H₂O: " + percent_composition(1.008, 2.0, 18.015) as str + "%")  // 11.19
 }
