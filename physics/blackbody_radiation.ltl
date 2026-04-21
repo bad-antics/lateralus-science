@@ -1,22 +1,78 @@
-// Science: Blackbody Radiation
-// Domain: physics
+// Blackbody radiation — Planck, Wien, Stefan-Boltzmann, Rayleigh-Jeans.
+//
+// Planck's law (1900) for spectral radiance per unit wavelength:
+//
+//     B_λ(λ, T) = (2·h·c²/λ⁵) · 1 / (exp(h·c/(λ·k·T)) − 1)   [W·sr⁻¹·m⁻³]
+//
+// Resolved the ultraviolet catastrophe of Rayleigh-Jeans and launched
+// quantum mechanics.
+//
+// Wien's displacement law:
+//     λ_max · T = b   with b ≈ 2.8977719 × 10⁻³ m·K
+// Stefan-Boltzmann total flux (integrate over λ):
+//     j* = σ · T⁴   σ = 5.670374419×10⁻⁸ W·m⁻²·K⁻⁴
+// Rayleigh-Jeans limit (λ·kT ≫ hc):  B_λ ≈ 2·c·k·T / λ⁴
+
 module science.physics.blackbody_radiation
 
-pub fn compute(params: map) -> map {
-    // Blackbody Radiation computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const H: float = 6.62607015e-34
+pub const C: float = 299_792_458.0
+pub const K: float = 1.380649e-23
+pub const WIEN_B: float = 2.897771955e-3
+pub const SIGMA: float = 5.670374419e-8
+
+/// Planck spectral radiance (wavelength form).
+pub fn planck_lambda(lam: float, t: float) -> float {
+    let a = 2.0 * H * C * C / (lam * lam * lam * lam * lam)
+    let x = H * C / (lam * K * t)
+    return a / (exp(x) - 1.0)
 }
 
-pub fn describe() -> str {
-    return "Blackbody Radiation — simulation and computation"
+/// Planck spectral radiance (frequency form).
+///   B_ν(ν, T) = (2·h·ν³/c²) · 1 / (exp(h·ν/(k·T)) − 1)
+pub fn planck_nu(nu: float, t: float) -> float {
+    let a = 2.0 * H * nu * nu * nu / (C * C)
+    let x = H * nu / (K * t)
+    return a / (exp(x) - 1.0)
+}
+
+/// Wavelength of peak emission.
+pub fn wien_peak_wavelength(temperature_k: float) -> float {
+    return WIEN_B / temperature_k
+}
+
+/// Stefan-Boltzmann total radiated power per area (W/m²).
+pub fn stefan_boltzmann(temperature_k: float) -> float {
+    let t2 = temperature_k * temperature_k
+    return SIGMA * t2 * t2
+}
+
+/// Luminosity of a sphere (W) given radius and surface T.
+pub fn luminosity_sphere(radius_m: float, t_k: float) -> float {
+    let pi = 3.141592653589793
+    return 4.0 * pi * radius_m * radius_m * stefan_boltzmann(t_k)
+}
+
+/// Rayleigh-Jeans approximation valid for λ·kT ≫ hc (radio frequencies).
+pub fn rayleigh_jeans(lam: float, t: float) -> float {
+    return 2.0 * C * K * t / (lam * lam * lam * lam)
+}
+
+fn exp(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }
+    let r = x - (n as float) * ln2
+    let mut t = 1.0; let mut s = 1.0; let mut k = 1
+    while k < 30 { t = t * r / (k as float); s += t; k += 1 }
+    let mag = if n < 0 { -n } else { n }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if n < 0 { p = 1.0 / p }
+    return s * p
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Blackbody Radiation: " + result as str)
+    // Sun T ≈ 5778 K; peak λ ≈ 501 nm (green-yellow, peak of visible spectrum).
+    println("λ_max(Sun) = " + (wien_peak_wavelength(5778.0) * 1e9) as str + " nm")
+    println("Sun L = " + luminosity_sphere(6.96e8, 5778.0) as str + " W")    // 3.83e26
 }
