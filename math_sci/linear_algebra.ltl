@@ -1,22 +1,147 @@
-// Science: Linear Algebra
-// Domain: math_sci
+// Linear algebra — small-to-medium dense matrix operations.
+//
+// Routines included:
+//   • matmul, matvec, transpose
+//   • LU factorization with partial pivoting (Doolittle form)
+//   • solve via forward/back substitution
+//   • determinant (from LU)
+//   • matrix inverse (by solving A·X = I column-by-column)
+//
+// All arithmetic is double precision. For production numerics use
+// LAPACK (dgesv, dgetrf); this module serves pedagogical and
+// small-scale needs.
+
 module science.math_sci.linear_algebra
 
-pub fn compute(params: map) -> map {
-    // Linear Algebra computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
+pub fn matmul(a: [[float]], b: [[float]]) -> [[float]] {
+    let m = a.len(); let n = b[0].len(); let p = b.len()
+    if a[0].len() != p { throw Error("matmul: shape mismatch") }
+    let mut c: [[float]] = []
+    let mut i = 0
+    while i < m {
+        let mut row: [float] = []
+        let mut j = 0
+        while j < n {
+            let mut s = 0.0; let mut k = 0
+            while k < p { s += a[i][k] * b[k][j]; k += 1 }
+            row.push(s); j += 1
+        }
+        c.push(row); i += 1
     }
-    return results
+    return c
 }
 
-pub fn describe() -> str {
-    return "Linear Algebra — simulation and computation"
+pub fn matvec(a: [[float]], x: [float]) -> [float] {
+    let m = a.len(); let n = x.len()
+    if a[0].len() != n { throw Error("matvec: shape mismatch") }
+    let mut y: [float] = []
+    let mut i = 0
+    while i < m {
+        let mut s = 0.0; let mut j = 0
+        while j < n { s += a[i][j] * x[j]; j += 1 }
+        y.push(s); i += 1
+    }
+    return y
 }
+
+pub fn transpose(a: [[float]]) -> [[float]] {
+    let m = a.len(); let n = a[0].len()
+    let mut t: [[float]] = []
+    let mut j = 0
+    while j < n {
+        let mut row: [float] = []
+        let mut i = 0
+        while i < m { row.push(a[i][j]); i += 1 }
+        t.push(row); j += 1
+    }
+    return t
+}
+
+pub struct LU { pub lu: [[float]], pub piv: [int], pub sign: int }
+
+/// LU with partial pivoting.  A is n×n.  Overwrites a copy.
+pub fn lu_decompose(a: [[float]]) -> LU {
+    let n = a.len()
+    let mut m: [[float]] = []
+    let mut i = 0
+    while i < n { m.push(a[i].clone()); i += 1 }
+    let mut piv: [int] = []; let mut k = 0
+    while k < n { piv.push(k); k += 1 }
+    let mut sign = 1
+    k = 0
+    while k < n {
+        // find pivot in column k
+        let mut best = k; let mut bv = abs_f(m[k][k])
+        let mut r = k + 1
+        while r < n { if abs_f(m[r][k]) > bv { bv = abs_f(m[r][k]); best = r }; r += 1 }
+        if bv == 0.0 { throw Error("matrix is singular") }
+        if best != k {
+            let tmp = m[k]; m[k] = m[best]; m[best] = tmp
+            let tp = piv[k]; piv[k] = piv[best]; piv[best] = tp
+            sign = -sign
+        }
+        let mut i2 = k + 1
+        while i2 < n {
+            m[i2][k] = m[i2][k] / m[k][k]
+            let mut j2 = k + 1
+            while j2 < n { m[i2][j2] = m[i2][j2] - m[i2][k] * m[k][j2]; j2 += 1 }
+            i2 += 1
+        }
+        k += 1
+    }
+    return LU { lu: m, piv: piv, sign: sign }
+}
+
+pub fn lu_solve(lu: LU, b: [float]) -> [float] {
+    let n = b.len()
+    // apply pivot to b
+    let mut y: [float] = []; let mut i = 0
+    while i < n { y.push(b[lu.piv[i]]); i += 1 }
+    // forward solve L·z = y
+    i = 0
+    while i < n { let mut s = y[i]; let mut j = 0; while j < i { s -= lu.lu[i][j] * y[j]; j += 1 }; y[i] = s; i += 1 }
+    // back solve U·x = z
+    let mut x: [float] = []; i = 0; while i < n { x.push(0.0); i += 1 }
+    let mut ii = n - 1
+    while ii >= 0 {
+        let mut s = y[ii]; let mut j = ii + 1
+        while j < n { s -= lu.lu[ii][j] * x[j]; j += 1 }
+        x[ii] = s / lu.lu[ii][ii]
+        if ii == 0 { break }
+        ii -= 1
+    }
+    return x
+}
+
+pub fn determinant(a: [[float]]) -> float {
+    let lu = lu_decompose(a)
+    let mut d = (lu.sign as float)
+    let mut i = 0
+    while i < a.len() { d *= lu.lu[i][i]; i += 1 }
+    return d
+}
+
+pub fn inverse(a: [[float]]) -> [[float]] {
+    let n = a.len()
+    let lu = lu_decompose(a)
+    let mut inv: [[float]] = []
+    let mut i = 0
+    while i < n {
+        let mut e: [float] = []; let mut j = 0
+        while j < n { e.push(if j == i { 1.0 } else { 0.0 }); j += 1 }
+        inv.push(lu_solve(lu, e))
+        i += 1
+    }
+    return transpose(inv)
+}
+
+fn abs_f(x: float) -> float { return if x < 0.0 { -x } else { x } }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Linear Algebra: " + result as str)
+    let a = [[4.0, 3.0], [6.0, 3.0]]
+    let b = [10.0, 12.0]
+    let lu = lu_decompose(a)
+    let x = lu_solve(lu, b)
+    println("x = [" + x[0] as str + ", " + x[1] as str + "]")   // [1, 2]
+    println("det A = " + determinant(a) as str)                  // -6
 }
