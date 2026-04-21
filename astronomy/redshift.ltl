@@ -1,22 +1,49 @@
-// Science: Redshift Calculation
-// Domain: astronomy
+// Astronomical redshift.
+//
+// Three regimes, all producing z = (λ_obs − λ_rest) / λ_rest:
+//
+//   1. Non-relativistic Doppler (v ≪ c):    1 + z ≈ 1 + v/c
+//   2. Relativistic Doppler:                 1 + z = √((1+β)/(1−β))   β = v/c
+//   3. Cosmological (metric expansion):      1 + z = a(now) / a(then)
+//
+// For z ≲ 0.1, Hubble's law and the Doppler approximation agree.
+// For high-z quasars (z ~ 7) the cosmological interpretation is
+// non-negotiable — that photon was emitted when the universe was ~800 Myr
+// old.
+
 module science.astronomy.redshift
 
-pub fn compute(params: map) -> map {
-    // Redshift Calculation computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const C: float = 299_792_458.0    // m/s
+
+pub fn redshift_from_wavelengths(lambda_obs: float, lambda_rest: float) -> float {
+    return (lambda_obs - lambda_rest) / lambda_rest
 }
 
-pub fn describe() -> str {
-    return "Redshift Calculation — simulation and computation"
+/// Non-relativistic velocity from z.
+pub fn velocity_classical(z: float) -> float { return C * z }
+
+/// Relativistic velocity from z.
+///   β = ((1+z)² − 1) / ((1+z)² + 1)
+pub fn velocity_relativistic(z: float) -> float {
+    let one_plus_z2 = (1.0 + z) * (1.0 + z)
+    return C * (one_plus_z2 - 1.0) / (one_plus_z2 + 1.0)
 }
+
+/// z from a relativistic velocity.
+pub fn z_from_velocity_relativistic(v: float) -> float {
+    if v >= C { throw Error("v must be < c") }
+    let beta = v / C
+    return sqrt((1.0 + beta) / (1.0 - beta)) - 1.0
+}
+
+/// Cosmological scale factor ratio.  a(then) = 1 / (1 + z).
+pub fn scale_factor_at_emission(z: float) -> float { return 1.0 / (1.0 + z) }
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Redshift Calculation: " + result as str)
+    // Hydrogen Lyman-α (1215.67 Å) observed at 1500 Å:
+    let z = redshift_from_wavelengths(1500.0, 1215.67)
+    println("z = " + z as str)                                // ~0.234
+    println("v_relativistic = " + velocity_relativistic(z) as str + " m/s")
 }
