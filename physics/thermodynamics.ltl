@@ -1,22 +1,101 @@
-// Science: Thermodynamics
-// Domain: physics
+// Thermodynamics — the four laws.
+//
+//   0th:  Thermal equilibrium is transitive (basis of temperature).
+//   1st:  ΔU = Q − W                   energy is conserved
+//   2nd:  ΔS_universe ≥ 0              entropy never decreases
+//   3rd:  S(T→0) → 0 (for perfect crystal)
+//
+// Ideal gas processes (n moles, gas constant R):
+//   Isothermal:  W = n·R·T·ln(V₂/V₁)        ΔU = 0
+//   Isobaric:    W = P·ΔV                    Q = n·C_p·ΔT
+//   Isochoric:   W = 0                       Q = n·C_v·ΔT
+//   Adiabatic:   P·V^γ = const,  T·V^(γ−1) = const,   γ = C_p/C_v
+//
+// Efficiency:
+//   Heat engine:        η = 1 − Q_cold/Q_hot
+//   Carnot (max):       η_c = 1 − T_c/T_h           reversible, upper bound
+//   Refrigerator COP:   β = Q_cold / W              > 1 for good fridges
+//   Heat pump COP:      γ = Q_hot  / W              = β + 1
+
 module science.physics.thermodynamics
 
-pub fn compute(params: map) -> map {
-    // Thermodynamics computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const R: float = 8.314462618         // J/(mol·K)
+
+// ---- 1st law processes for ideal gas ----
+pub fn work_isothermal(n: float, t: float, v1: float, v2: float) -> float {
+    return n * R * t * ln(v2 / v1)
+}
+pub fn work_isobaric(p: float, v1: float, v2: float) -> float {
+    return p * (v2 - v1)
+}
+pub fn delta_u_const_v(n: float, cv: float, t1: float, t2: float) -> float {
+    return n * cv * (t2 - t1)
+}
+pub fn delta_h_const_p(n: float, cp: float, t1: float, t2: float) -> float {
+    return n * cp * (t2 - t1)
 }
 
-pub fn describe() -> str {
-    return "Thermodynamics — simulation and computation"
+/// Adiabatic P·V^γ = const : given initial state + final V, find final P.
+pub fn adiabatic_pressure(p1: float, v1: float, v2: float, gamma: float) -> float {
+    return p1 * pow(v1 / v2, gamma)
 }
+
+/// Adiabatic T·V^(γ−1) = const : final T from final V.
+pub fn adiabatic_temperature(t1: float, v1: float, v2: float, gamma: float) -> float {
+    return t1 * pow(v1 / v2, gamma - 1.0)
+}
+
+// ---- 2nd law: cycle efficiencies ----
+pub fn efficiency_heat_engine(q_hot: float, q_cold: float) -> float {
+    return 1.0 - q_cold / q_hot
+}
+
+pub fn carnot_efficiency(t_hot: float, t_cold: float) -> float {
+    if t_hot <= t_cold { throw Error("Carnot needs T_hot > T_cold") }
+    return 1.0 - t_cold / t_hot
+}
+
+pub fn cop_refrigerator(t_cold: float, t_hot: float) -> float {
+    return t_cold / (t_hot - t_cold)         // Carnot fridge
+}
+
+pub fn cop_heat_pump(t_cold: float, t_hot: float) -> float {
+    return t_hot / (t_hot - t_cold)          // Carnot heat pump = fridge + 1
+}
+
+// ---- Entropy ----
+pub fn entropy_change_ideal_gas(n: float, cv: float,
+                                 t1: float, t2: float, v1: float, v2: float) -> float {
+    return n * cv * ln(t2 / t1) + n * R * ln(v2 / v1)
+}
+
+fn ln(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let mut m = x; let mut k = 0.0
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }
+    return k * ln2 + 2.0 * sum
+}
+fn exp(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }
+    let r = x - (n as float) * ln2
+    let mut t = 1.0; let mut s = 1.0; let mut k = 1
+    while k < 25 { t = t * r / (k as float); s += t; k += 1 }
+    let mag = if n < 0 { -n } else { n }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if n < 0 { p = 1.0 / p }
+    return s * p
+}
+fn pow(x: float, y: float) -> float { return exp(y * ln(x)) }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Thermodynamics: " + result as str)
+    // Ideal Carnot engine between 500 K and 300 K:
+    println("η_Carnot = " + carnot_efficiency(500.0, 300.0) as str)    // 0.40
+    // Fridge 260 K inside, 300 K room:
+    println("COP fridge = " + cop_refrigerator(260.0, 300.0) as str)   // 6.5
 }
