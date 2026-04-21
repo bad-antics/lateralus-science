@@ -1,22 +1,77 @@
-// Science: Momentum & Impulse
-// Domain: physics
+// Linear momentum and impulse.
+//
+//   p = m · v                        (vector)
+//   J = ∫ F dt = Δp                   impulse-momentum theorem
+//
+// Conservation (closed system, no external forces):
+//   Σ p_initial = Σ p_final
+//
+// Elastic collisions conserve both momentum and KE. Inelastic ones
+// conserve only momentum. Coefficient of restitution e quantifies
+// the "bounciness" (1 = elastic, 0 = perfectly inelastic).
+//
+// Center of mass:
+//   r_cm = Σ m_i · r_i / Σ m_i       — moves as if all mass were concentrated there
+//   acting on it is the net external force (Newton's 2nd for systems).
+
 module science.physics.momentum
 
-pub fn compute(params: map) -> map {
-    // Momentum & Impulse computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub fn momentum(mass: float, v: float) -> float { return mass * v }
+
+pub fn impulse(force: float, dt: float) -> float { return force * dt }
+
+/// Δp from constant force over time.
+pub fn impulse_changes_velocity(mass: float, force: float, dt: float, v_initial: float) -> float {
+    return v_initial + force * dt / mass
 }
 
-pub fn describe() -> str {
-    return "Momentum & Impulse — simulation and computation"
+/// 1-D elastic collision: both momentum and KE conserved.
+pub fn elastic_1d(m1: float, v1: float, m2: float, v2: float) -> (float, float) {
+    let sum = m1 + m2
+    let u1 = ((m1 - m2) * v1 + 2.0 * m2 * v2) / sum
+    let u2 = ((m2 - m1) * v2 + 2.0 * m1 * v1) / sum
+    return (u1, u2)
+}
+
+/// Perfectly inelastic: bodies stick.
+pub fn inelastic_1d(m1: float, v1: float, m2: float, v2: float) -> float {
+    return (m1 * v1 + m2 * v2) / (m1 + m2)
+}
+
+/// Center-of-mass position.
+pub fn center_of_mass(masses: [float], positions: [float]) -> float {
+    let mut mr = 0.0; let mut m = 0.0
+    let mut i = 0
+    while i < masses.len() {
+        mr += masses[i] * positions[i]
+        m  += masses[i]
+        i += 1
+    }
+    return mr / m
+}
+
+/// Rocket equation (Tsiolkovsky, 1903):
+///   Δv = v_exhaust · ln(m_initial / m_final)
+/// The reason multi-stage rockets exist.
+pub fn rocket_delta_v(v_exhaust: float, m_initial: float, m_final: float) -> float {
+    if m_final <= 0.0 || m_initial <= m_final { throw Error("mass ratio invalid") }
+    return v_exhaust * ln(m_initial / m_final)
+}
+
+fn ln(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let mut m = x; let mut k = 0.0
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }
+    return k * ln2 + 2.0 * sum
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Momentum & Impulse: " + result as str)
+    // Saturn V stage 1: v_e ≈ 2580 m/s, m_0/m_f ≈ 3.5 → Δv ≈ 3231 m/s
+    println("Saturn V S-IC Δv ≈ " + rocket_delta_v(2580.0, 3.5, 1.0) as str + " m/s")
+    let (u1, u2) = elastic_1d(2.0, 3.0, 1.0, 0.0)
+    println("2kg(3) + 1kg(0) elastic → " + u1 as str + ", " + u2 as str)  // 1, 4
 }
