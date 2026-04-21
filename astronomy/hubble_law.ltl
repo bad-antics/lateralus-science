@@ -1,22 +1,50 @@
-// Science: Hubble's Law
-// Domain: astronomy
+// Hubble-Lemaître Law (Lemaître 1927; Hubble 1929).
+//
+//   v = H₀ · d
+//
+// Galaxies recede with speed proportional to distance — the observable
+// signature of metric expansion. Current best value of the Hubble
+// constant:
+//   • Planck 2018 CMB:   H₀ = 67.4 ± 0.5 km/s/Mpc
+//   • SH0ES Cepheids:    H₀ = 73.0 ± 1.0 km/s/Mpc
+// This "Hubble tension" is one of today's outstanding open puzzles
+// in cosmology.
+//
+// For redshift z ≪ 1 the Doppler approximation v ≈ c·z holds. For
+// larger z use the relativistic cosmological redshift formula
+// (see astronomy/redshift.ltl).
+
 module science.astronomy.hubble_law
 
-pub fn compute(params: map) -> map {
-    // Hubble's Law computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const H0_PLANCK: float = 67.4         // km/s/Mpc
+pub const MPC_IN_METERS: float = 3.0857e22
+
+/// Recessional velocity (km/s) for distance in Mpc using H₀.
+pub fn recession_velocity_kms(distance_mpc: float, h0: float) -> float {
+    return h0 * distance_mpc
 }
 
-pub fn describe() -> str {
-    return "Hubble's Law — simulation and computation"
+/// Distance estimate (Mpc) from recessional velocity.
+pub fn hubble_distance_mpc(velocity_kms: float, h0: float) -> float {
+    if h0 <= 0.0 { throw Error("hubble: H0 must be positive") }
+    return velocity_kms / h0
+}
+
+/// Age of the universe lower bound: t_H = 1/H₀. With H₀ = 67.4 km/s/Mpc
+/// you get ~14.5 Gyr — close to the actual 13.8 Gyr accounting for
+/// dark-energy acceleration history.
+pub fn hubble_time_seconds(h0_kms_per_mpc: float) -> float {
+    let h0_si = (h0_kms_per_mpc * 1000.0) / MPC_IN_METERS   // s⁻¹
+    return 1.0 / h0_si
+}
+
+pub fn hubble_time_gyr(h0_kms_per_mpc: float) -> float {
+    let seconds_per_gyr = 3.1557e16
+    return hubble_time_seconds(h0_kms_per_mpc) / seconds_per_gyr
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Hubble's Law: " + result as str)
+    println("Andromeda recession @ 0.778 Mpc: " +
+             recession_velocity_kms(0.778, H0_PLANCK) as str + " km/s")
+    println("Hubble time: " + hubble_time_gyr(H0_PLANCK) as str + " Gyr")
 }
