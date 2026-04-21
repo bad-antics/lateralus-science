@@ -1,22 +1,57 @@
-// Science: Kepler's Laws
-// Domain: astronomy
+// Kepler's three laws of planetary motion (1609, 1619).
+//
+//   I.   Orbits are ellipses with the star at one focus.
+//   II.  Equal areas are swept in equal times (angular-momentum conservation).
+//   III. T² ∝ a³   (with constant = 4π² / (G·M) for gravitational two-body).
+//
+// Rederived by Newton from universal gravitation. Today Kepler's 3rd
+// law is the workhorse for measuring planetary masses: if you can
+// measure T and a for a moon, you immediately know M_planet.
+
 module science.astronomy.kepler_laws
 
-pub fn compute(params: map) -> map {
-    // Kepler's Laws computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const G: float = 6.674e-11
+pub const PI: float = 3.141592653589793
+
+/// Third law: period T (s) given semi-major axis a (m) and central mass M (kg).
+pub fn orbital_period(semi_major_axis_m: float, central_mass_kg: float) -> float {
+    let a = semi_major_axis_m
+    return 2.0 * PI * sqrt(a * a * a / (G * central_mass_kg))
 }
 
-pub fn describe() -> str {
-    return "Kepler's Laws — simulation and computation"
+/// Invert Kepler III for semi-major axis given period and central mass.
+pub fn semi_major_axis(period_s: float, central_mass_kg: float) -> float {
+    let t = period_s
+    return cbrt(G * central_mass_kg * t * t / (4.0 * PI * PI))
+}
+
+/// Derive central mass from an observed satellite: M = 4π²·a³ / (G·T²).
+pub fn central_mass_from_orbit(a_m: float, period_s: float) -> float {
+    return 4.0 * PI * PI * a_m * a_m * a_m / (G * period_s * period_s)
+}
+
+/// Vis-viva equation — speed at radius r on an orbit of semi-major a.
+///     v² = G·M · (2/r − 1/a)
+pub fn vis_viva_speed(central_mass_kg: float, r_m: float, a_m: float) -> float {
+    return sqrt(G * central_mass_kg * (2.0 / r_m - 1.0 / a_m))
+}
+
+fn sqrt(x: float) -> float {
+    if x <= 0.0 { return 0.0 }
+    let mut g = x; let mut i = 0
+    while i < 40 { g = 0.5 * (g + x / g); i += 1 }
+    return g
+}
+fn cbrt(x: float) -> float {
+    if x == 0.0 { return 0.0 }
+    let mut g = x; let mut i = 0
+    while i < 40 { g = (2.0 * g + x / (g * g)) / 3.0; i += 1 }
+    return g
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Kepler's Laws: " + result as str)
+    let au = 1.496e11; let m_sun = 1.989e30
+    let t = orbital_period(au, m_sun)
+    println("Earth year (s): " + t as str)      // ~3.156e7
+    println("Earth year (d): " + (t / 86400.0) as str)   // ~365.25
 }
