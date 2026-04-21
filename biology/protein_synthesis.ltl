@@ -1,22 +1,94 @@
-// Science: Protein Synthesis
-// Domain: biology
+// Protein synthesis — transcription (DNA→mRNA) and translation
+// (mRNA→protein) using the standard genetic code (NCBI table 1).
+//
+// The code is degenerate: 64 codons → 20 amino acids + STOP. Most
+// redundancy is in the third "wobble" position. Start codon: AUG
+// (methionine); stops: UAA, UAG, UGA.
+//
+// Module operations (string in, string out):
+//   transcribe(dna)       — coding-strand DNA → mRNA (T → U)
+//   translate(mrna)       — first ORF translation, stops at *
+//   codon_table()         — static map for inspection
+//
+// NOTE: biology uses multiple code variants (mitochondrial, ciliates);
+// this module implements the "standard" code only.
+
 module science.biology.protein_synthesis
 
-pub fn compute(params: map) -> map {
-    // Protein Synthesis computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
+/// Transcribe a coding-strand DNA sequence (5'→3') into mRNA.
+/// Replaces T with U; leaves A,C,G; errors on unknown letters.
+pub fn transcribe(dna: str) -> str {
+    let mut out = ""
+    for ch in dna {
+        if      ch == 'A' || ch == 'a' { out += "A" }
+        else if ch == 'C' || ch == 'c' { out += "C" }
+        else if ch == 'G' || ch == 'g' { out += "G" }
+        else if ch == 'T' || ch == 't' { out += "U" }
+        else if ch == 'U' || ch == 'u' { out += "U" }
+        else { throw Error("transcribe: unknown nucleotide " + ch as str) }
     }
-    return results
+    return out
 }
 
-pub fn describe() -> str {
-    return "Protein Synthesis — simulation and computation"
+/// Translate an mRNA into a one-letter amino-acid string.
+/// Begins at the first AUG; terminates at the first in-frame stop.
+/// Returns empty string if no start codon found.
+pub fn translate(mrna: str) -> str {
+    let n = mrna.len()
+    // find first AUG
+    let mut i = 0
+    while i + 3 <= n {
+        if mrna[i] == 'A' && mrna[i+1] == 'U' && mrna[i+2] == 'G' { break }
+        i += 1
+    }
+    if i + 3 > n { return "" }
+    let mut out = ""
+    while i + 3 <= n {
+        let aa = codon_to_aa(mrna[i], mrna[i+1], mrna[i+2])
+        if aa == '*' { break }
+        out += aa as str
+        i += 3
+    }
+    return out
+}
+
+/// Standard NCBI table 1. '*' is STOP.
+pub fn codon_to_aa(b1: char, b2: char, b3: char) -> char {
+    let c = (b1 as str) + (b2 as str) + (b3 as str)
+    // TTT/TTC=F TTA/TTG=L CTN=L ATT/ATC/ATA=I ATG=M GTN=V
+    if c == "UUU" || c == "UUC" { return 'F' }
+    if c == "UUA" || c == "UUG" || c == "CUU" || c == "CUC"
+       || c == "CUA" || c == "CUG" { return 'L' }
+    if c == "AUU" || c == "AUC" || c == "AUA" { return 'I' }
+    if c == "AUG" { return 'M' }
+    if c == "GUU" || c == "GUC" || c == "GUA" || c == "GUG" { return 'V' }
+    // UCN=S AGU/AGC=S
+    if c == "UCU" || c == "UCC" || c == "UCA" || c == "UCG"
+       || c == "AGU" || c == "AGC" { return 'S' }
+    if c == "CCU" || c == "CCC" || c == "CCA" || c == "CCG" { return 'P' }
+    if c == "ACU" || c == "ACC" || c == "ACA" || c == "ACG" { return 'T' }
+    if c == "GCU" || c == "GCC" || c == "GCA" || c == "GCG" { return 'A' }
+    // stops / Y / H / Q / N / K / D / E
+    if c == "UAU" || c == "UAC" { return 'Y' }
+    if c == "UAA" || c == "UAG" || c == "UGA" { return '*' }
+    if c == "CAU" || c == "CAC" { return 'H' }
+    if c == "CAA" || c == "CAG" { return 'Q' }
+    if c == "AAU" || c == "AAC" { return 'N' }
+    if c == "AAA" || c == "AAG" { return 'K' }
+    if c == "GAU" || c == "GAC" { return 'D' }
+    if c == "GAA" || c == "GAG" { return 'E' }
+    // C / W / R / G
+    if c == "UGU" || c == "UGC" { return 'C' }
+    if c == "UGG" { return 'W' }
+    if c == "CGU" || c == "CGC" || c == "CGA" || c == "CGG"
+       || c == "AGA" || c == "AGG" { return 'R' }
+    if c == "GGU" || c == "GGC" || c == "GGA" || c == "GGG" { return 'G' }
+    throw Error("codon_to_aa: unknown codon " + c)
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Protein Synthesis: " + result as str)
+    let dna = "ATGGCCTGA"            // M A *
+    let mrna = transcribe(dna)       // AUGGCCUGA
+    let pep = translate(mrna)        // "MA"
+    println("Peptide: " + pep)
 }
