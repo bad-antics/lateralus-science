@@ -1,22 +1,79 @@
-// Science: Random Walk Simulation
-// Domain: math_sci
+// Random walks — discrete and continuous.
+//
+// 1-D simple random walk on ℤ:
+//     S_n = Σ X_i,  X_i ∈ {±1} equiprobable.
+//     E[S_n] = 0,  Var[S_n] = n,  S_n / √n ⇒ N(0,1)  (CLT)
+// Recurrence theorem (Pólya 1921): SRW on ℤ and ℤ² is recurrent
+// (returns to 0 infinitely often w.p. 1); on ℤ³ is transient.
+//
+// Brownian motion / Wiener process W(t):
+//     W(0) = 0;  W(t) − W(s) ~ N(0, t−s);  independent increments.
+// This module simulates both via xorshift64*.
+//
+// Applications: diffusion, Black-Scholes option pricing, Wright-Fisher
+// genetic drift, PageRank.
+
 module science.math_sci.random_walk
 
-pub fn compute(params: map) -> map {
-    // Random Walk Simulation computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub struct Rng { pub state: u64 }
+pub fn rng_new(seed: u64) -> Rng { return Rng { state: if seed == 0 { 0xDEADBEEFu64 } else { seed } } }
+pub fn rng_u64(r: &mut Rng) -> u64 { let mut s = r.state; s ^= s >> 12; s ^= s << 25; s ^= s >> 27; r.state = s; return s * 2685821657736338717u64 }
+pub fn rng_unif(r: &mut Rng) -> float { return ((rng_u64(r) >> 11) as float) * (1.0 / 9007199254740992.0) }
+
+/// Box-Muller standard Gaussian.
+pub fn rng_gauss(r: &mut Rng) -> float {
+    let u1 = rng_unif(r); let u2 = rng_unif(r)
+    let u1s = if u1 < 1e-300 { 1e-300 } else { u1 }
+    return sqrt(-2.0 * ln(u1s)) * cos(2.0 * 3.141592653589793 * u2)
 }
 
-pub fn describe() -> str {
-    return "Random Walk Simulation — simulation and computation"
+/// Simple 1-D SRW: final position after n steps.
+pub fn srw_1d(n: int, r: &mut Rng) -> int {
+    let mut s = 0; let mut i = 0
+    while i < n { s += if rng_u64(r) & 1u64 == 0u64 { -1 } else { 1 }; i += 1 }
+    return s
 }
+
+/// 2-D SRW: final (x,y) after n steps (up/down/left/right equi-probable).
+pub fn srw_2d(n: int, r: &mut Rng) -> (int, int) {
+    let mut x = 0; let mut y = 0; let mut i = 0
+    while i < n {
+        let d = (rng_u64(r) & 3u64) as int
+        if d == 0 { x += 1 } else if d == 1 { x -= 1 }
+        else if d == 2 { y += 1 } else { y -= 1 }
+        i += 1
+    }
+    return (x, y)
+}
+
+/// Discretized Brownian motion: W(t) at t = k·dt for k=0..n.
+pub fn brownian_path(n: int, dt: float, r: &mut Rng) -> [float] {
+    let mut path: [float] = []; path.push(0.0)
+    let sd = sqrt(dt)
+    let mut i = 0
+    while i < n {
+        let prev = path[path.len() - 1]
+        path.push(prev + sd * rng_gauss(r))
+        i += 1
+    }
+    return path
+}
+
+/// Geometric Brownian motion — S(t+dt) = S(t)·exp((μ − σ²/2)·dt + σ·√dt·Z).
+pub fn gbm_step(s: float, mu: float, sigma: float, dt: float, r: &mut Rng) -> float {
+    let drift = (mu - 0.5 * sigma * sigma) * dt
+    let diff  = sigma * sqrt(dt) * rng_gauss(r)
+    return s * exp(drift + diff)
+}
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
+fn ln(x: float) -> float { let ln2 = 0.6931471805599453; let mut m = x; let mut k = 0.0; while m >= 2.0 { m = m / 2.0; k += 1.0 }; while m < 1.0 { m = m * 2.0; k -= 1.0 }; let u = (m - 1.0) / (m + 1.0); let u2 = u * u; let mut term = u; let mut sum = 0.0; let mut n = 1; while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }; return k * ln2 + 2.0 * sum }
+fn exp(x: float) -> float { let ln2 = 0.6931471805599453; let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }; let r = x - (n as float) * ln2; let mut t = 1.0; let mut s = 1.0; let mut k = 1; while k < 25 { t = t * r / (k as float); s += t; k += 1 }; let mag = if n < 0 { -n } else { n }; let mut p = 1.0; let mut i = 0; while i < mag { p = p * 2.0; i += 1 }; if n < 0 { p = 1.0 / p }; return s * p }
+fn cos(x: float) -> float { let pi = 3.141592653589793; let mut y = x; while y > pi { y -= 2.0 * pi }; while y < -pi { y += 2.0 * pi }; let mut s = 1.0; let mut t = 1.0; let mut k = 1; while k < 20 { t = -t * y * y / (((2*k-1) as float) * ((2*k) as float)); s += t; k += 1 }; return s }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Random Walk Simulation: " + result as str)
+    let mut r = rng_new(7)
+    println("SRW after 10000 steps: " + srw_1d(10000, &mut r) as str)   // O(√10000)=100
+    let path = brownian_path(1000, 0.001, &mut r)
+    println("BM @ t=1: " + path[1000] as str)    // ~N(0,1)
 }
