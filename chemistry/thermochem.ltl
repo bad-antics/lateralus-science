@@ -1,22 +1,100 @@
-// Science: Thermochemistry
-// Domain: chemistry
+// Thermochemistry — enthalpy, entropy, Gibbs free energy, Hess's law.
+//
+//   ΔH_rxn = Σ n·ΔH_f°(products)  −  Σ n·ΔH_f°(reactants)         (Hess)
+//   ΔS_rxn = Σ n·S°(products)     −  Σ n·S°(reactants)
+//   ΔG = ΔH − T·ΔS     (Gibbs)
+//   ΔG = ΔG° + RT·ln Q
+//   ΔG° = −RT·ln K_eq  (equilibrium)
+//
+// Sign conventions:
+//   ΔG < 0  spontaneous (favourable at T)
+//   ΔG > 0  non-spontaneous
+//   ΔG = 0  at equilibrium
+//
+// Heat capacity (q = m·c·ΔT  or  q = C·ΔT) and Clausius-Clapeyron
+// (vapor pressure ↔ ΔH_vap) helpers included.
+
 module science.chemistry.thermochem
 
-pub fn compute(params: map) -> map {
-    // Thermochemistry computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const R: float = 8.314462618
+
+pub struct Species { pub n: float, pub h_f: float, pub s_std: float }   // mol, J/mol, J/(mol·K)
+
+/// Hess's law ΔH_rxn (J) from products and reactants.
+pub fn delta_h_rxn(products: [Species], reactants: [Species]) -> float {
+    let mut s = 0.0
+    for p in products  { s += p.n * p.h_f }
+    for r in reactants { s -= r.n * r.h_f }
+    return s
 }
 
-pub fn describe() -> str {
-    return "Thermochemistry — simulation and computation"
+/// ΔS_rxn (J/K) similarly from standard entropies.
+pub fn delta_s_rxn(products: [Species], reactants: [Species]) -> float {
+    let mut s = 0.0
+    for p in products  { s += p.n * p.s_std }
+    for r in reactants { s -= r.n * r.s_std }
+    return s
+}
+
+/// ΔG = ΔH − T·ΔS.
+pub fn delta_g(delta_h: float, delta_s: float, temperature_k: float) -> float {
+    return delta_h - temperature_k * delta_s
+}
+
+/// ΔG from ΔG° and reaction quotient Q.
+pub fn delta_g_nonstd(delta_g_std: float, t: float, q: float) -> float {
+    return delta_g_std + R * t * ln(q)
+}
+
+/// Equilibrium constant from ΔG° (J/mol).
+pub fn keq_from_dg(dg_std: float, t: float) -> float {
+    return exp(-dg_std / (R * t))
+}
+
+/// Heat: q = m·c·ΔT (c in J/(g·K)).
+pub fn heat_sensible(mass_g: float, c_specific: float, delta_t_k: float) -> float {
+    return mass_g * c_specific * delta_t_k
+}
+
+/// Clausius-Clapeyron: ln(P₂/P₁) = −ΔH_vap/R · (1/T₂ − 1/T₁).
+pub fn vapor_pressure(p1: float, dh_vap: float, t1: float, t2: float) -> float {
+    return p1 * exp(-dh_vap / R * (1.0 / t2 - 1.0 / t1))
+}
+
+// ---- math ----
+fn ln(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let mut m = x; let mut k = 0.0
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }
+    return k * ln2 + 2.0 * sum
+}
+fn exp(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }
+    let r = x - (n as float) * ln2
+    let mut t = 1.0; let mut s = 1.0; let mut k = 1
+    while k < 25 { t = t * r / (k as float); s += t; k += 1 }
+    let mag = if n < 0 { -n } else { n }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if n < 0 { p = 1.0 / p }
+    return s * p
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Thermochemistry: " + result as str)
+    // Combustion of methane: CH4 + 2 O2 → CO2 + 2 H2O(l)
+    // ΔH_f° (kJ/mol): CH4 −74.8, O2 0, CO2 −393.5, H2O(l) −285.8
+    let products  = [Species { n: 1.0, h_f: -393_500.0, s_std: 213.7 },
+                     Species { n: 2.0, h_f: -285_800.0, s_std: 69.9 }]
+    let reactants = [Species { n: 1.0, h_f:  -74_800.0, s_std: 186.3 },
+                     Species { n: 2.0, h_f:        0.0, s_std: 205.0 }]
+    let dh = delta_h_rxn(products, reactants)       // -890.1 kJ/mol
+    let ds = delta_s_rxn(products, reactants)
+    let dg = delta_g(dh, ds, 298.15)
+    println("Methane combustion ΔH = " + (dh / 1000.0) as str + " kJ/mol")
+    println("                   ΔG = " + (dg / 1000.0) as str + " kJ/mol")
 }
