@@ -1,22 +1,63 @@
-// Science: Fluid Dynamics
-// Domain: physics
+// Fluid dynamics — Bernoulli, continuity, Reynolds, Poiseuille, drag.
+//
+// Continuity (incompressible):  A₁·v₁ = A₂·v₂
+// Bernoulli (steady, inviscid, incompressible along a streamline):
+//     P + ½·ρ·v² + ρ·g·h = const
+// Reynolds number:  Re = ρ·v·L / μ      (transition around 2300 in pipe)
+// Hagen-Poiseuille (laminar, circular pipe):
+//     Q = π·r⁴·ΔP / (8·μ·L)       Pressure drop drives volumetric flow
+// Drag (blunt body):
+//     F_d = ½·ρ·v²·C_d·A
+// Stokes law (creeping flow on sphere):
+//     F_s = 6·π·μ·r·v         (Re ≪ 1; used for falling droplets)
+
 module science.physics.fluid_dynamics
 
-pub fn compute(params: map) -> map {
-    // Fluid Dynamics computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const PI: float = 3.141592653589793
+pub const G_EARTH: float = 9.80665
+
+pub fn continuity_v2(a1: float, v1: float, a2: float) -> float {
+    return a1 * v1 / a2
 }
 
-pub fn describe() -> str {
-    return "Fluid Dynamics — simulation and computation"
+/// Bernoulli: solve for P₂ given P₁, v₁, h₁, v₂, h₂, ρ.
+pub fn bernoulli_p2(p1: float, v1: float, h1: float,
+                     v2: float, h2: float, rho: float, g: float) -> float {
+    return p1 + 0.5 * rho * (v1 * v1 - v2 * v2) + rho * g * (h1 - h2)
 }
+
+/// Torricelli's law — speed of efflux from a tank of liquid at depth h.
+pub fn torricelli_speed(h: float, g: float) -> float { return sqrt(2.0 * g * h) }
+
+pub fn reynolds(rho: float, v: float, l_char: float, mu: float) -> float {
+    return rho * v * l_char / mu
+}
+
+pub fn hagen_poiseuille_flow(radius: float, pressure_drop: float, length: float, mu: float) -> float {
+    let r2 = radius * radius
+    return PI * r2 * r2 * pressure_drop / (8.0 * mu * length)
+}
+
+pub fn drag_force(rho: float, v: float, cd: float, area: float) -> float {
+    return 0.5 * rho * v * v * cd * area
+}
+
+pub fn stokes_drag(mu: float, radius: float, v: float) -> float {
+    return 6.0 * PI * mu * radius * v
+}
+
+/// Terminal velocity of a sphere settling in viscous fluid (Stokes regime).
+///   v_t = 2·r²·g·(ρ_s − ρ_f) / (9·μ)
+pub fn terminal_velocity_stokes(radius: float, rho_solid: float, rho_fluid: float, mu: float) -> float {
+    return 2.0 * radius * radius * G_EARTH * (rho_solid - rho_fluid) / (9.0 * mu)
+}
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Fluid Dynamics: " + result as str)
+    // Flow in 2-cm pipe at 1 m/s, water (ρ=1000, μ=1e-3):
+    println("Re = " + reynolds(1000.0, 1.0, 0.02, 1e-3) as str)   // 20000 → turbulent
+    // 5-mm water droplet terminal speed in air (ρ=1.2, μ=1.8e-5) — Stokes breaks for big drops:
+    println("Oil drop (r=1 µm) vt = " +
+             terminal_velocity_stokes(1e-6, 900.0, 1.2, 1.8e-5) as str + " m/s")
 }
