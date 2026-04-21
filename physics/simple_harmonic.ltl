@@ -1,22 +1,67 @@
-// Science: Simple Harmonic Motion
-// Domain: physics
+// Simple harmonic motion — linear restoring force F = −k·x.
+//
+//   d²x/dt² = −ω²·x       ω² = k/m
+//   x(t) = A·cos(ω·t + φ)
+//   v(t) = −A·ω·sin(ω·t + φ)
+//   a(t) = −A·ω²·cos(ω·t + φ) = −ω²·x
+//   E_total = ½·k·A² = ½·m·ω²·A²        (energy bouncing between KE and PE)
+//
+// Period:  T = 2π/ω = 2π·√(m/k)     (mass-spring)
+//          T = 2π·√(L/g)             (simple pendulum, small-angle)
+//
+// Damped SHM  d²x/dt² + 2γ·dx/dt + ω₀²·x = 0:
+//   • under-damped  (γ < ω₀):   oscillates with decaying amplitude
+//   • critically damped (γ = ω₀): fastest non-oscillating return to 0
+//   • over-damped  (γ > ω₀):   slow exponential decay, no oscillation
+
 module science.physics.simple_harmonic
 
-pub fn compute(params: map) -> map {
-    // Simple Harmonic Motion computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const PI: float = 3.141592653589793
+
+pub fn angular_frequency_spring(k: float, m: float) -> float { return sqrt(k / m) }
+pub fn period_spring(k: float, m: float) -> float { return 2.0 * PI * sqrt(m / k) }
+pub fn frequency_spring(k: float, m: float) -> float { return 1.0 / period_spring(k, m) }
+
+pub fn angular_frequency_pendulum(l: float, g: float) -> float { return sqrt(g / l) }
+pub fn period_pendulum(l: float, g: float) -> float { return 2.0 * PI * sqrt(l / g) }
+
+pub fn position(a: float, omega: float, phi: float, t: float) -> float {
+    return a * cos(omega * t + phi)
+}
+pub fn velocity(a: float, omega: float, phi: float, t: float) -> float {
+    return -a * omega * sin(omega * t + phi)
+}
+pub fn acceleration(a: float, omega: float, phi: float, t: float) -> float {
+    let c = cos(omega * t + phi)
+    return -a * omega * omega * c
 }
 
-pub fn describe() -> str {
-    return "Simple Harmonic Motion — simulation and computation"
+pub fn energy_total(k: float, a: float) -> float { return 0.5 * k * a * a }
+
+/// Under-damped SHM amplitude envelope: A(t) = A₀·e^(−γ·t)
+pub fn damped_position(a0: float, gamma: float, omega_d: float, phi: float, t: float) -> float {
+    return a0 * exp(-gamma * t) * cos(omega_d * t + phi)
 }
+
+/// Damped angular frequency ω_d = √(ω₀² − γ²).
+pub fn damped_omega(omega0: float, gamma: float) -> float {
+    let a = omega0 * omega0 - gamma * gamma
+    return if a > 0.0 { sqrt(a) } else { 0.0 }
+}
+
+/// Quality factor Q = ω₀ / (2γ): high Q = sharp resonance.
+pub fn quality_factor(omega0: float, gamma: float) -> float { return omega0 / (2.0 * gamma) }
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
+fn sin(x: float) -> float { let y = reduce(x); let mut s = y; let mut t = y; let mut k = 1; while k < 20 { t = -t * y * y / (((2*k) as float) * ((2*k+1) as float)); s += t; k += 1 }; return s }
+fn cos(x: float) -> float { let y = reduce(x); let mut s = 1.0; let mut t = 1.0; let mut k = 1; while k < 20 { t = -t * y * y / (((2*k-1) as float) * ((2*k) as float)); s += t; k += 1 }; return s }
+fn reduce(x: float) -> float { let mut y = x; while y > PI { y -= 2.0 * PI }; while y < -PI { y += 2.0 * PI }; return y }
+fn exp(x: float) -> float { let ln2 = 0.6931471805599453; let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }; let r = x - (n as float) * ln2; let mut t = 1.0; let mut s = 1.0; let mut k = 1; while k < 25 { t = t * r / (k as float); s += t; k += 1 }; let mag = if n < 0 { -n } else { n }; let mut p = 1.0; let mut i = 0; while i < mag { p = p * 2.0; i += 1 }; if n < 0 { p = 1.0 / p }; return s * p }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Simple Harmonic Motion: " + result as str)
+    // Mass 1 kg on spring k = 100 N/m:
+    println("T = " + period_spring(100.0, 1.0) as str + " s")    // 0.628
+    println("f = " + frequency_spring(100.0, 1.0) as str + " Hz")// 1.59
+    // 1-m pendulum on Earth: T = 2π·√(1/9.81) ≈ 2.006 s
+    println("T (1 m pendulum) = " + period_pendulum(1.0, 9.80665) as str)
 }
