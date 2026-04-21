@@ -1,22 +1,70 @@
-// Science: Lotka-Volterra Equations
-// Domain: biology
+// Lotka-Volterra predator-prey equations (Lotka 1925; Volterra 1926).
+//
+//   dx/dt = α·x − β·x·y        (prey x)
+//   dy/dt = δ·x·y − γ·y        (predator y)
+//
+//   α = prey birth rate           β = predation rate coefficient
+//   γ = predator death rate       δ = predator reproduction per prey
+//
+// Solutions are closed orbits in (x,y) phase space — populations
+// oscillate indefinitely with fixed amplitude. Conserved quantity:
+//   V(x,y) = δ·x − γ·ln(x) + β·y − α·ln(y) = const.
+//
+// Integrated here with classical Runge-Kutta 4. Realistic ecology
+// adds carrying capacity (logistic prey), functional response
+// (Holling type II/III), etc.
+
 module science.biology.lotka_volterra
 
-pub fn compute(params: map) -> map {
-    // Lotka-Volterra Equations computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
+pub struct State { pub x: float, pub y: float }      // prey, predator
+pub struct Params { pub alpha: float, pub beta: float, pub delta: float, pub gamma: float }
+
+pub fn derivatives(s: State, p: Params) -> State {
+    return State {
+        x: p.alpha * s.x - p.beta  * s.x * s.y,
+        y: p.delta * s.x * s.y - p.gamma * s.y,
     }
-    return results
 }
 
-pub fn describe() -> str {
-    return "Lotka-Volterra Equations — simulation and computation"
+/// One RK4 step of step size h.
+pub fn rk4_step(s: State, p: Params, h: float) -> State {
+    let k1 = derivatives(s, p)
+    let k2 = derivatives(State { x: s.x + 0.5 * h * k1.x, y: s.y + 0.5 * h * k1.y }, p)
+    let k3 = derivatives(State { x: s.x + 0.5 * h * k2.x, y: s.y + 0.5 * h * k2.y }, p)
+    let k4 = derivatives(State { x: s.x + h * k3.x,       y: s.y + h * k3.y       }, p)
+    return State {
+        x: s.x + h / 6.0 * (k1.x + 2.0 * k2.x + 2.0 * k3.x + k4.x),
+        y: s.y + h / 6.0 * (k1.y + 2.0 * k2.y + 2.0 * k3.y + k4.y),
+    }
+}
+
+/// Conserved quantity (up to numerical drift).
+pub fn invariant(s: State, p: Params) -> float {
+    return p.delta * s.x - p.gamma * ln(s.x) + p.beta * s.y - p.alpha * ln(s.y)
+}
+
+/// Fixed point (equilibrium): x* = γ/δ, y* = α/β.
+pub fn equilibrium(p: Params) -> State {
+    return State { x: p.gamma / p.delta, y: p.alpha / p.beta }
+}
+
+fn ln(x: float) -> float {
+    if x <= 0.0 { throw Error("ln: non-positive") }
+    let ln2 = 0.6931471805599453
+    let mut m = x; let mut k = 0.0
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }
+    return k * ln2 + 2.0 * sum
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Lotka-Volterra Equations: " + result as str)
+    let p = Params { alpha: 1.1, beta: 0.4, delta: 0.1, gamma: 0.4 }
+    let mut s = State { x: 10.0, y: 10.0 }
+    let v0 = invariant(s, p)
+    let mut i = 0
+    while i < 10000 { s = rk4_step(s, p, 0.01); i += 1 }       // t = 100
+    println("Invariant drift: " + (invariant(s, p) - v0) as str)   // tiny
 }
