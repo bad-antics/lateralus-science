@@ -1,22 +1,65 @@
-// Science: Mendelian Genetics
-// Domain: biology
+// Mendelian genetics (Gregor Mendel, 1866 — pea-plant experiments).
+//
+// For a single-gene, two-allele system with complete dominance:
+//   • AA × AA → 100% AA
+//   • AA × Aa →  50% AA  50% Aa       (all phenotypically dominant)
+//   • Aa × Aa →  25% AA  50% Aa  25% aa   (3:1 dominant:recessive)
+//   • Aa × aa →  50% Aa  50% aa       (1:1)
+//   • aa × aa → 100% aa
+//
+// Dihybrid independent assortment gives the classic 9:3:3:1 ratio
+// (Mendel's second law). Real loci on the same chromosome are
+// linked — use recombination frequency for mapping distance.
+
 module science.biology.mendelian_genetics
 
-pub fn compute(params: map) -> map {
-    // Mendelian Genetics computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
+// A genotype is 2 bytes: '\0' for recessive 'a', non-zero for dominant 'A'.
+pub struct Offspring { pub aa: float, pub aa_het: float, pub bb: float }
+
+/// Punnett square for monohybrid cross of two genotypes.
+/// `p1` and `p2`: number of dominant alleles (0, 1, or 2).
+/// Returns offspring genotype probabilities (AA, Aa, aa).
+pub fn monohybrid_cross(p1_dom: int, p2_dom: int) -> Offspring {
+    if p1_dom < 0 || p1_dom > 2 || p2_dom < 0 || p2_dom > 2 {
+        throw Error("dominant allele count must be 0..2")
     }
-    return results
+    // P(A) for parent = dominant / 2.
+    let a1 = (p1_dom as float) / 2.0
+    let a2 = (p2_dom as float) / 2.0
+    let p_aa = a1 * a2
+    let p_aa_het = a1 * (1.0 - a2) + (1.0 - a1) * a2
+    let p_bb = (1.0 - a1) * (1.0 - a2)
+    return Offspring { aa: p_aa, aa_het: p_aa_het, bb: p_bb }
 }
 
-pub fn describe() -> str {
-    return "Mendelian Genetics — simulation and computation"
+/// Probability offspring shows dominant phenotype.
+pub fn dominant_phenotype_prob(p1_dom: int, p2_dom: int) -> float {
+    let o = monohybrid_cross(p1_dom, p2_dom)
+    return o.aa + o.aa_het
+}
+
+/// Dihybrid cross assuming independent assortment — joint distribution
+/// over (A-locus, B-locus) with values (AA, Aa, aa) each.
+/// Returns 9-entry table flattened as [p_aa_bb, p_aa_bb_het, p_aa_bb_rec,
+///                                       p_het_bb, p_het_het, p_het_rec,
+///                                       p_rec_bb, p_rec_het, p_rec_rec].
+pub fn dihybrid_cross(a1: int, a2: int, b1: int, b2: int) -> [float] {
+    let oa = monohybrid_cross(a1, a2)
+    let ob = monohybrid_cross(b1, b2)
+    let a_probs = [oa.aa, oa.aa_het, oa.bb]
+    let b_probs = [ob.aa, ob.aa_het, ob.bb]
+    let mut out: [float] = []
+    for pa in a_probs {
+        for pb in b_probs {
+            out.push(pa * pb)
+        }
+    }
+    return out
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Mendelian Genetics: " + result as str)
+    // Aa × Aa: classic 1:2:1 genotype / 3:1 phenotype.
+    let o = monohybrid_cross(1, 1)
+    println("AA=" + o.aa as str + " Aa=" + o.aa_het as str + " aa=" + o.bb as str)
+    println("Dominant phenotype: " + dominant_phenotype_prob(1, 1) as str)   // 0.75
 }
