@@ -1,22 +1,57 @@
-// Science: Neural Action Potential
-// Domain: biology
+// Neural spike modeling — FitzHugh-Nagumo simplification of
+// Hodgkin-Huxley (Nobel 1963).
+//
+// Full HH has 4 coupled ODEs (V, m, h, n) and reproduces the squid
+// giant axon action potential with astonishing fidelity. FitzHugh-
+// Nagumo (1961) collapses it to 2 ODEs retaining the key qualitative
+// dynamics — a fast "voltage" v and slow recovery w:
+//
+//     dv/dt = v − v³/3 − w + I_ext
+//     dw/dt = 0.08 · (v + 0.7 − 0.8·w)
+//
+// Exhibits threshold, refractoriness, and repetitive firing above
+// a Hopf-bifurcation current. This module integrates FHN with RK4
+// and reports spike times by zero-crossing detection.
+
 module science.biology.neural_spike
 
-pub fn compute(params: map) -> map {
-    // Neural Action Potential computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
+pub struct Neuron { pub v: float, pub w: float }
+
+pub fn fhn_derivs(n: Neuron, i_ext: float) -> Neuron {
+    return Neuron {
+        v: n.v - n.v * n.v * n.v / 3.0 - n.w + i_ext,
+        w: 0.08 * (n.v + 0.7 - 0.8 * n.w),
     }
-    return results
 }
 
-pub fn describe() -> str {
-    return "Neural Action Potential — simulation and computation"
+pub fn rk4_step(n: Neuron, i_ext: float, h: float) -> Neuron {
+    let k1 = fhn_derivs(n, i_ext)
+    let k2 = fhn_derivs(Neuron { v: n.v + 0.5 * h * k1.v, w: n.w + 0.5 * h * k1.w }, i_ext)
+    let k3 = fhn_derivs(Neuron { v: n.v + 0.5 * h * k2.v, w: n.w + 0.5 * h * k2.w }, i_ext)
+    let k4 = fhn_derivs(Neuron { v: n.v + h * k3.v,       w: n.w + h * k3.w       }, i_ext)
+    return Neuron {
+        v: n.v + h / 6.0 * (k1.v + 2.0 * k2.v + 2.0 * k3.v + k4.v),
+        w: n.w + h / 6.0 * (k1.w + 2.0 * k2.w + 2.0 * k3.w + k4.w),
+    }
+}
+
+/// Count threshold crossings (upward through v = 1.0) over duration.
+/// Returns approximate firing rate in Hz given step dt.
+pub fn firing_rate(i_ext: float, dt: float, steps: int) -> float {
+    let mut n = Neuron { v: -1.2, w: -0.6 }     // rest state
+    let mut prev = n.v
+    let mut spikes = 0
+    let mut i = 0
+    while i < steps {
+        n = rk4_step(n, i_ext, dt)
+        if prev < 1.0 && n.v >= 1.0 { spikes += 1 }
+        prev = n.v
+        i += 1
+    }
+    // Time units in FHN are dimensionless; scale by 1000 for "ms-like" reporting.
+    return (spikes as float) / ((steps as float) * dt) * 1000.0
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Neural Action Potential: " + result as str)
+    println("FHN rate @ I=0.5: " + firing_rate(0.5, 0.01, 20000) as str)   // >0 spikes
 }
