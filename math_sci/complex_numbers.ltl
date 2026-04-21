@@ -1,22 +1,106 @@
-// Science: Complex Numbers
-// Domain: math_sci
+// Complex numbers — z = a + b·i   with   i² = −1.
+//
+// Algebra and the polar/exponential form:
+//   |z|  = √(a² + b²)           arg(z) = atan2(b, a)
+//   z    = r·(cos θ + i·sin θ) = r·e^(iθ)            Euler
+//   e^(iπ) + 1 = 0                                     Euler's identity
+//
+// Used for: AC-circuit phasors, signal processing (FFT), quantum
+// mechanics (wavefunctions), fractals, control theory (pole-zero),
+// complex analysis (residue theorem).
+
 module science.math_sci.complex_numbers
 
-pub fn compute(params: map) -> map {
-    // Complex Numbers computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub struct C { pub re: float, pub im: float }
+
+pub fn add(a: C, b: C) -> C { return C { re: a.re + b.re, im: a.im + b.im } }
+pub fn sub(a: C, b: C) -> C { return C { re: a.re - b.re, im: a.im - b.im } }
+pub fn mul(a: C, b: C) -> C {
+    return C { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }
+}
+pub fn div(a: C, b: C) -> C {
+    let d = b.re * b.re + b.im * b.im
+    return C { re: (a.re * b.re + a.im * b.im) / d,
+               im: (a.im * b.re - a.re * b.im) / d }
+}
+pub fn conj(z: C)  -> C { return C { re: z.re, im: -z.im } }
+pub fn abs(z: C)   -> float { return sqrt(z.re * z.re + z.im * z.im) }
+pub fn arg(z: C)   -> float { return atan2(z.im, z.re) }
+
+/// Exponential: e^z = e^a · (cos b + i sin b).
+pub fn cexp(z: C) -> C {
+    let e = exp(z.re)
+    return C { re: e * cos(z.im), im: e * sin(z.im) }
 }
 
-pub fn describe() -> str {
-    return "Complex Numbers — simulation and computation"
+/// Principal complex logarithm: ln z = ln|z| + i·arg(z).
+pub fn cln(z: C) -> C { return C { re: ln(abs(z)), im: arg(z) } }
+
+/// Integer power by repeated squaring.
+pub fn cpow_int(z: C, n: int) -> C {
+    if n == 0 { return C { re: 1.0, im: 0.0 } }
+    let mut base = z
+    let mut result = C { re: 1.0, im: 0.0 }
+    let mut e = if n < 0 { -n } else { n }
+    while e > 0 {
+        if e & 1 == 1 { result = mul(result, base) }
+        base = mul(base, base)
+        e = e >> 1
+    }
+    if n < 0 { return div(C { re: 1.0, im: 0.0 }, result) }
+    return result
+}
+
+// ---- transcendental kernels ----
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
+fn sin(x: float) -> float { let y = reduce_2pi(x); return sin_core(y) }
+fn cos(x: float) -> float { let y = reduce_2pi(x); return cos_core(y) }
+fn sin_core(x: float) -> float { let mut s = x; let mut t = x; let mut k = 1; while k < 20 { t = -t * x * x / (((2*k) as float) * ((2*k+1) as float)); s += t; k += 1 }; return s }
+fn cos_core(x: float) -> float { let mut s = 1.0; let mut t = 1.0; let mut k = 1; while k < 20 { t = -t * x * x / (((2*k-1) as float) * ((2*k) as float)); s += t; k += 1 }; return s }
+fn reduce_2pi(x: float) -> float { let pi = 3.141592653589793; let mut y = x; while y > pi { y -= 2.0 * pi }; while y < -pi { y += 2.0 * pi }; return y }
+fn atan2(y: float, x: float) -> float {
+    let pi = 3.141592653589793
+    if x > 0.0 { return atan(y / x) }
+    if x < 0.0 && y >= 0.0 { return atan(y / x) + pi }
+    if x < 0.0 && y <  0.0 { return atan(y / x) - pi }
+    if y > 0.0 { return  pi / 2.0 }
+    if y < 0.0 { return -pi / 2.0 }
+    return 0.0
+}
+fn atan(x: float) -> float {
+    if x > 1.0  { return 3.141592653589793 / 2.0 - atan(1.0 / x) }
+    if x < -1.0 { return -3.141592653589793 / 2.0 - atan(1.0 / x) }
+    let mut s = x; let mut t = x; let mut k = 1
+    while k < 30 { t = -t * x * x; s += t / (((2*k+1)) as float); k += 1 }
+    return s
+}
+fn exp(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }
+    let r = x - (n as float) * ln2
+    let mut t = 1.0; let mut s = 1.0; let mut k = 1
+    while k < 25 { t = t * r / (k as float); s += t; k += 1 }
+    let mag = if n < 0 { -n } else { n }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if n < 0 { p = 1.0 / p }
+    return s * p
+}
+fn ln(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let mut m = x; let mut k = 0.0
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }
+    return k * ln2 + 2.0 * sum
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Complex Numbers: " + result as str)
+    let i = C { re: 0.0, im: 1.0 }
+    let minus_one = mul(i, i)
+    println("i² = (" + minus_one.re as str + "," + minus_one.im as str + ")")  // -1, 0
+    let euler = add(cexp(C { re: 0.0, im: 3.141592653589793 }), C { re: 1.0, im: 0.0 })
+    println("e^(iπ)+1 ≈ (" + euler.re as str + "," + euler.im as str + ")")
 }
