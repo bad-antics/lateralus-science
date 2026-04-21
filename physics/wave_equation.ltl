@@ -1,22 +1,87 @@
-// Science: Wave Equation
-// Domain: physics
+// The classical wave equation — d'Alembert, Euler, Lagrange (18th c.).
+//
+//     ∂²u/∂t² = c² · ∂²u/∂x²           (1-D, constant speed c)
+//
+// General solution (d'Alembert 1747):
+//     u(x, t) = f(x − c·t) + g(x + c·t)
+// (right-moving plus left-moving wave of arbitrary shape).
+//
+// Separation of variables on [0, L] with u(0,t)=u(L,t)=0 gives the
+// standing-wave modes:
+//     u_n(x,t) = sin(n·π·x/L) · (A_n·cos(ω_n·t) + B_n·sin(ω_n·t))
+//     ω_n = n·π·c / L
+//
+// This module:
+//   • Evaluates d'Alembert form given f, g
+//   • Computes mode frequencies for a fixed string
+//   • Integrates the PDE numerically by second-order central finite
+//     differences on a uniform grid (explicit leapfrog),
+//     CFL stability: (c·dt/dx) ≤ 1.
+
 module science.physics.wave_equation
 
-pub fn compute(params: map) -> map {
-    // Wave Equation computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const PI: float = 3.141592653589793
+
+pub type Prof = fn(float) -> float
+
+/// d'Alembert travelling-wave solution u(x,t) = f(x−ct) + g(x+ct).
+pub fn dalembert(f: Prof, g: Prof, c: float, x: float, t: float) -> float {
+    return f(x - c * t) + g(x + c * t)
 }
 
-pub fn describe() -> str {
-    return "Wave Equation — simulation and computation"
+/// n-th harmonic angular frequency on a fixed string of length L.
+pub fn mode_omega(n: int, c: float, length: float) -> float {
+    return (n as float) * PI * c / length
 }
+
+/// Frequency f_n (Hz) of n-th harmonic.
+pub fn mode_frequency(n: int, c: float, length: float) -> float {
+    return (n as float) * c / (2.0 * length)
+}
+
+/// Speed of a transverse wave on a string: c = √(T/μ).
+///   T = tension (N), μ = mass/length (kg/m).
+pub fn string_wave_speed(tension_n: float, mass_per_length: float) -> float {
+    return sqrt(tension_n / mass_per_length)
+}
+
+/// Sound speed in ideal gas:  c = √(γ·R·T/M)   M in kg/mol.
+pub fn gas_sound_speed(gamma: float, r: float, temperature_k: float, m_kg_mol: float) -> float {
+    return sqrt(gamma * r * temperature_k / m_kg_mol)
+}
+
+/// Explicit leapfrog advance of the 1-D wave equation on a fixed
+/// grid.  u_now is u(x, t), u_prev is u(x, t−dt); returns u(x, t+dt).
+/// Dirichlet boundaries u[0] = u[n-1] = 0 enforced.
+pub fn advance_step(u_now: [float], u_prev: [float], c: float, dx: float, dt: float) -> [float] {
+    let n = u_now.len()
+    let r = c * dt / dx
+    let r2 = r * r
+    if r > 1.0 { throw Error("CFL violation: c·dt/dx > 1") }
+    let mut next: [float] = []
+    let mut i = 0
+    while i < n {
+        if i == 0 || i == n - 1 {
+            next.push(0.0)
+        } else {
+            let v = 2.0 * (1.0 - r2) * u_now[i]
+                  + r2 * (u_now[i + 1] + u_now[i - 1])
+                  - u_prev[i]
+            next.push(v)
+        }
+        i += 1
+    }
+    return next
+}
+
+fn sqrt(x: float) -> float { if x <= 0.0 { return 0.0 }; let mut g = x; let mut i = 0; while i < 40 { g = 0.5 * (g + x / g); i += 1 }; return g }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Wave Equation: " + result as str)
+    // A 440 (concert pitch) guitar string 0.648 m long:
+    // for n = 1, f = c / (2L) → c = 2·L·f = 2·0.648·440 = 570 m/s.
+    println("String mode 1 freq (c=570, L=0.648): "
+             + mode_frequency(1, 570.0, 0.648) as str + " Hz")
+    // Sound in air at 20 °C (γ=1.4, M=0.029):
+    println("Sound speed in air @ 293 K: "
+             + gas_sound_speed(1.4, 8.314, 293.15, 0.029) as str + " m/s")
 }
