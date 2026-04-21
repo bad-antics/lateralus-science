@@ -1,22 +1,89 @@
-// Science: Chemical Equilibrium
-// Domain: chemistry
+// Chemical equilibrium.
+//
+// For a reaction  aA + bB  ⇌  cC + dD  the equilibrium constant is
+//
+//     K_c = ([C]^c · [D]^d) / ([A]^a · [B]^b)        (concentrations)
+//     K_p = (P_C^c · P_D^d) / (P_A^a · P_B^b)        (partial pressures)
+//     K_p = K_c · (RT)^Δn   with Δn = (c+d) − (a+b)
+//
+// Reaction quotient Q uses non-equilibrium concentrations; system
+// shifts right (Q<K), left (Q>K), or is at equilibrium (Q=K).
+// Le Chatelier's principle follows directly from this.
+//
+// Temperature dependence: van 't Hoff equation
+//     ln(K₂/K₁) = −ΔH° / R · (1/T₂ − 1/T₁)
+
 module science.chemistry.equilibrium
 
-pub fn compute(params: map) -> map {
-    // Chemical Equilibrium computation
-    let mut results = {}
-    for k in keys(params) {
-        results[k] = params[k]
-    }
-    return results
+pub const R: float = 8.314462618        // J/(mol·K)  (CODATA)
+
+/// Generic K = Π[products]^stoich / Π[reactants]^stoich.
+pub fn equilibrium_constant(products: [(float, float)],    // (conc, stoich)
+                             reactants: [(float, float)]) -> float {
+    let mut num = 1.0
+    for (c, n) in products  { num *= pow(c, n) }
+    let mut den = 1.0
+    for (c, n) in reactants { den *= pow(c, n) }
+    return num / den
 }
 
-pub fn describe() -> str {
-    return "Chemical Equilibrium — simulation and computation"
+/// Convert between K_c and K_p.  K_p = K_c · (RT)^Δn, with R in L·atm/(mol·K) = 0.08206.
+pub fn kc_to_kp(kc: float, delta_n: float, temperature_k: float) -> float {
+    let r_latm = 0.082057366      // L·atm·K⁻¹·mol⁻¹
+    return kc * pow(r_latm * temperature_k, delta_n)
+}
+
+/// Reaction quotient Q (same form as K, evaluated at arbitrary state).
+pub fn reaction_quotient(products: [(float, float)],
+                          reactants: [(float, float)]) -> float {
+    return equilibrium_constant(products, reactants)
+}
+
+/// Van 't Hoff: extrapolate K from T₁ to T₂.
+pub fn vant_hoff(k1: float, delta_h_j_per_mol: float, t1: float, t2: float) -> float {
+    let ratio = -delta_h_j_per_mol / R * (1.0 / t2 - 1.0 / t1)
+    return k1 * exp(ratio)
+}
+
+// ---- math ----
+fn pow(x: float, y: float) -> float {
+    if x <= 0.0 {
+        // integer y only when base is zero/negative
+        let n = y as int
+        let mut p = 1.0; let mut i = 0
+        while i < (if n < 0 { -n } else { n }) { p = p * x; i += 1 }
+        if n < 0 { p = 1.0 / p }
+        return p
+    }
+    return exp(y * ln(x))
+}
+fn ln(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let mut m = x; let mut k = 0.0
+    while m >= 2.0 { m = m / 2.0; k += 1.0 }
+    while m < 1.0  { m = m * 2.0; k -= 1.0 }
+    let u = (m - 1.0) / (m + 1.0); let u2 = u * u
+    let mut term = u; let mut sum = 0.0; let mut n = 1
+    while n < 30 { sum += term / (n as float); term = term * u2; n += 2 }
+    return k * ln2 + 2.0 * sum
+}
+fn exp(x: float) -> float {
+    let ln2 = 0.6931471805599453
+    let n = if x >= 0.0 { (x / ln2 + 0.5) as int } else { (x / ln2 - 0.5) as int }
+    let r = x - (n as float) * ln2
+    let mut t = 1.0; let mut s = 1.0; let mut k = 1
+    while k < 25 { t = t * r / (k as float); s += t; k += 1 }
+    let mag = if n < 0 { -n } else { n }
+    let mut p = 1.0; let mut i = 0
+    while i < mag { p = p * 2.0; i += 1 }
+    if n < 0 { p = 1.0 / p }
+    return s * p
 }
 
 fn main() {
-    let params = {"input": 1.0, "scale": 1.0}
-    let result = compute(params)
-    println("Chemical Equilibrium: " + result as str)
+    // Haber process N₂ + 3H₂ ⇌ 2NH₃ with [N2]=0.2, [H2]=0.6, [NH3]=0.1
+    let k = equilibrium_constant(
+        [(0.1, 2.0)],
+        [(0.2, 1.0), (0.6, 3.0)])
+    println("Kc = " + k as str)    // 0.01/(0.2·0.216) = 0.231
 }
